@@ -1,5 +1,9 @@
 # PPTX Viewer
 
+[![npm version](https://img.shields.io/npm/v/pptx-viewer.svg)](https://www.npmjs.com/package/pptx-viewer)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/pptx-viewer)](https://bundlephobia.com/package/pptx-viewer)
+[![license](https://img.shields.io/npm/l/pptx-viewer.svg)](https://github.com/YOUR_USERNAME/pptx-viewer/blob/main/LICENSE)
+
 A lightweight, dependency-minimal library for viewing PowerPoint (PPTX) files in the browser.
 
 ## Features
@@ -287,6 +291,25 @@ npm run build
 npm run typecheck
 ```
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Areas for Contribution
+
+- Additional shape types
+- Better text rendering fidelity
+- Table support
+- Slide master/layout inheritance
+- Performance optimizations
+- Test coverage
+
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE) for details.
