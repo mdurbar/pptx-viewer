@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPTX Viewer - Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f0f0f;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 20px;
+      background-color: #1a1a1a;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 500;
+    }
+
+    .upload-section {
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background-color: #1a1a1a;
+    }
+
+    .upload-btn {
+      padding: 12px 24px;
+      background-color: #4a90d9;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .upload-btn:hover {
+      background-color: #5a9fe9;
+    }
+
+    .file-name {
+      color: #888;
+      font-size: 14px;
+    }
+
+    #viewer-container {
+      flex: 1;
+      min-height: 500px;
+    }
+
+    .instructions {
+      padding: 40px;
+      text-align: center;
+      color: #666;
+    }
+
+    .instructions p {
+      margin-bottom: 16px;
+    }
+
+    .keyboard-hints {
+      margin-top: 20px;
+      padding: 20px;
+      background-color: #1a1a1a;
+      border-top: 1px solid #333;
+    }
+
+    .keyboard-hints h3 {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    .keyboard-hints ul {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .keyboard-hints li {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .keyboard-hints kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background-color: #333;
+      border-radius: 3px;
+      font-family: monospace;
+      margin-right: 4px;
+    }
+
+    #file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PPTX Viewer</h1>
+  </header>
+
+  <section class="upload-section">
+    <input type="file" id="file-input" accept=".pptx">
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+      Open PPTX File
+    </button>
+    <span class="file-name" id="file-name">No file selected</span>
+  </section>
+
+  <div id="viewer-container">
+    <div class="instructions">
+      <p>Select a PPTX file to view it in your browser.</p>
+      <p>Use arrow keys or click the controls to navigate between slides.</p>
+    </div>
+  </div>
+
+  <section class="keyboard-hints">
+    <h3>Keyboard Shortcuts</h3>
+    <ul>
+      <li><kbd>→</kbd> / <kbd>Space</kbd> Next slide</li>
+      <li><kbd>←</kbd> Previous slide</li>
+      <li><kbd>Home</kbd> First slide</li>
+      <li><kbd>End</kbd> Last slide</li>
+      <li><kbd>F</kbd> Toggle fullscreen</li>
+      <li><kbd>Esc</kbd> Exit fullscreen</li>
+    </ul>
+  </section>
+
+  <script type="module">
+    import { PPTXViewer } from './src/index.ts';
+
+    // Create viewer instance
+    const viewer = new PPTXViewer('#viewer-container', {
+      showControls: true,
+      keyboardNavigation: true,
+      onSlideChange: (index) => {
+        console.log(`Slide changed to ${index + 1}`);
+      },
+      onLoad: (presentation) => {
+        console.log('Presentation loaded:', presentation.metadata);
+        console.log(`${presentation.slides.length} slides`);
+      },
+      onError: (error) => {
+        console.error('Error loading presentation:', error);
+        alert(`Error: ${error.message}`);
+      },
+    });
+
+    // Handle file selection
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      document.getElementById('file-name').textContent = file.name;
+
+      try {
+        await viewer.load(file);
+      } catch (error) {
+        console.error('Failed to load file:', error);
+      }
+    });
+
+    // Make viewer accessible for debugging
+    window.viewer = viewer;
+  </script>
+</body>
+</html>
