@@ -240,20 +240,20 @@ presentation.slides.forEach((slide, index) => {
 
 ### Fully Supported
 
-- Basic shapes (rectangles, ellipses, triangles, etc.)
-- Text with formatting (font, size, color, bold, italic, underline)
-- Images (PNG, JPEG, GIF, etc.)
-- Solid and gradient fills
-- Stroke/outline styles
-- Grouped shapes
-- Theme colors and fonts
-- Slide backgrounds
+- **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
+- **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough
+- **Hyperlinks** - Clickable links in text
+- **Images** - PNG, JPEG, GIF, etc.
+- **Solid and gradient fills** - Including theme colors and preset colors
+- **Stroke/outline styles** - Color, width, dash patterns
+- **Grouped shapes** - Nested groups supported
+- **Theme colors and fonts** - Full theme support
+- **Slide backgrounds** - Solid and gradient
 
 ### Partially Supported
 
 - Charts (rendered as fallback images when available)
 - SmartArt (rendered as fallback images when available)
-- Complex shapes (simplified to basic approximations)
 
 ### Not Supported
 
@@ -289,6 +289,15 @@ npm run build
 
 # Type check
 npm run typecheck
+
+# Run tests
+npm test
+
+# Run tests once (CI mode)
+npm run test:run
+
+# Run tests with coverage
+npm run test:coverage
 ```
 
 ## Contributing
@@ -303,12 +312,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Areas for Contribution
 
-- Additional shape types
-- Better text rendering fidelity
 - Table support
 - Slide master/layout inheritance
+- Better text rendering fidelity
 - Performance optimizations
-- Test coverage
+- Additional shape types and effects
 
 ## License
 
