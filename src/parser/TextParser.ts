@@ -19,6 +19,7 @@ import type {
   Color,
   ThemeColors,
 } from '../core/types';
+import type { RelationshipMap } from './RelationshipParser';
 import {
   findChildByName,
   findChildrenByName,
@@ -35,9 +36,14 @@ import { parseHexColor, resolveThemeColor, resolvePresetColor, parseOoxmlAlpha }
  *
  * @param txBody - The txBody XML element
  * @param themeColors - Theme colors for resolving color references
+ * @param relationships - Optional relationships for resolving hyperlinks
  * @returns Parsed text body
  */
-export function parseTextBody(txBody: Element, themeColors: ThemeColors): TextBody {
+export function parseTextBody(
+  txBody: Element,
+  themeColors: ThemeColors,
+  relationships?: RelationshipMap
+): TextBody {
   const paragraphs: Paragraph[] = [];
 
   // Parse body properties
@@ -48,7 +54,7 @@ export function parseTextBody(txBody: Element, themeColors: ThemeColors): TextBo
   // Parse paragraphs
   const pElements = findChildrenByName(txBody, 'p');
   for (const pElement of pElements) {
-    const paragraph = parseParagraph(pElement, themeColors);
+    const paragraph = parseParagraph(pElement, themeColors, relationships);
     paragraphs.push(paragraph);
   }
 
@@ -97,7 +103,11 @@ function parseVerticalAlign(bodyPr: Element | null): TextBody['verticalAlign'] {
 /**
  * Parses a paragraph element.
  */
-function parseParagraph(pElement: Element, themeColors: ThemeColors): Paragraph {
+function parseParagraph(
+  pElement: Element,
+  themeColors: ThemeColors,
+  relationships?: RelationshipMap
+): Paragraph {
   const runs: TextRun[] = [];
 
   // Parse paragraph properties
@@ -112,7 +122,7 @@ function parseParagraph(pElement: Element, themeColors: ThemeColors): Paragraph 
   // Parse runs
   const rElements = findChildrenByName(pElement, 'r');
   for (const rElement of rElements) {
-    const run = parseTextRun(rElement, themeColors);
+    const run = parseTextRun(rElement, themeColors, relationships);
     runs.push(run);
   }
 
@@ -250,14 +260,18 @@ function parseBullet(pPr: Element | null): BulletStyle | undefined {
 /**
  * Parses a text run element.
  */
-function parseTextRun(rElement: Element, themeColors: ThemeColors): TextRun {
+function parseTextRun(
+  rElement: Element,
+  themeColors: ThemeColors,
+  relationships?: RelationshipMap
+): TextRun {
   // Get text content
   const tElement = findChildByName(rElement, 't');
   const text = tElement ? getTextContent(tElement) : '';
 
   // Parse run properties
   const rPr = findChildByName(rElement, 'rPr');
-  const formatting = parseRunProperties(rPr, themeColors);
+  const formatting = parseRunProperties(rPr, themeColors, relationships);
 
   return {
     text,
@@ -270,7 +284,8 @@ function parseTextRun(rElement: Element, themeColors: ThemeColors): TextRun {
  */
 function parseRunProperties(
   rPr: Element | null,
-  themeColors: ThemeColors
+  themeColors: ThemeColors,
+  relationships?: RelationshipMap
 ): Omit<TextRun, 'text'> {
   if (!rPr) {
     return {};
@@ -327,11 +342,13 @@ function parseRunProperties(
   // Hyperlink
   const hlinkClick = findChildByName(rPr, 'hlinkClick');
   if (hlinkClick) {
-    // The actual URL is in the relationships file, referenced by r:id
-    // For now, mark that there's a link
     const rId = getAttribute(hlinkClick, 'r:id');
-    if (rId) {
-      result.link = rId; // Will be resolved later
+    if (rId && relationships) {
+      // Resolve the actual URL from relationships
+      const rel = relationships.get(rId);
+      if (rel && rel.target) {
+        result.link = rel.target;
+      }
     }
   }
 

@@ -124,7 +124,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
 
   // Parse text content
   const txBody = findChildByName(sp, 'txBody');
-  const text = txBody ? parseTextBody(txBody, context.themeColors) : undefined;
+  const text = txBody ? parseTextBody(txBody, context.themeColors, context.relationships) : undefined;
 
   // Check if fill/stroke are visually empty
   const hasVisibleFill = fill && fill.type !== 'none';
