@@ -54,6 +54,11 @@ export type {
   TextElement,
   ImageElement,
   GroupElement,
+  TableElement,
+  TableRow,
+  TableCell,
+  TableStyle,
+  CellBorders,
   ElementType,
 
   // Styling

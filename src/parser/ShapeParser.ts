@@ -15,6 +15,11 @@ import type {
   TextElement,
   ImageElement,
   GroupElement,
+  TableElement,
+  TableRow,
+  TableCell,
+  TableStyle,
+  CellBorders,
   Bounds,
   ShapeType,
   Fill,
@@ -244,9 +249,9 @@ function parseGroup(grpSp: Element, context: ShapeParseContext): GroupElement | 
 
 /**
  * Parses a graphic frame (charts, tables, SmartArt).
- * Attempts to use fallback image.
+ * Attempts to parse tables directly, falls back to images for other content.
  */
-function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): ImageElement | null {
+function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): TableElement | ImageElement | null {
   // Get non-visual properties for ID
   const nvGraphicFramePr = findChildByName(graphicFrame, 'nvGraphicFramePr');
   const cNvPr = nvGraphicFramePr ? findChildByName(nvGraphicFramePr, 'cNvPr') : null;
@@ -261,11 +266,20 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): I
 
   const rotation = parseRotationFromXfrm(xfrm);
 
-  // Look for fallback image in the graphic element
+  // Look for graphic content
   const graphic = findChildByName(graphicFrame, 'graphic');
   if (!graphic) return null;
 
-  // Try to find an image reference
+  const graphicData = findChildByName(graphic, 'graphicData');
+  if (!graphicData) return null;
+
+  // Check if this is a table
+  const tbl = findChildByName(graphicData, 'tbl');
+  if (tbl) {
+    return parseTable(tbl, id, bounds, rotation, context);
+  }
+
+  // Try to find a fallback image for charts/SmartArt
   const blip = findFirstByName(graphic, 'blip');
   if (blip) {
     const rEmbed = getAttribute(blip, 'r:embed');
@@ -289,8 +303,169 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): I
     }
   }
 
-  // No fallback image found
+  // No parseable content found
   return null;
+}
+
+/**
+ * Parses a table element.
+ */
+function parseTable(
+  tbl: Element,
+  id: string,
+  bounds: Bounds,
+  rotation: number | undefined,
+  context: ShapeParseContext
+): TableElement {
+  // Parse table properties
+  const tblPr = findChildByName(tbl, 'tblPr');
+  const style = parseTableStyle(tblPr);
+
+  // Parse column widths from tblGrid
+  const tblGrid = findChildByName(tbl, 'tblGrid');
+  const columnWidths: number[] = [];
+  if (tblGrid) {
+    const gridCols = findChildrenByName(tblGrid, 'gridCol');
+    for (const gridCol of gridCols) {
+      const w = getNumberAttribute(gridCol, 'w', 0);
+      columnWidths.push(emuToPixels(w));
+    }
+  }
+
+  // Parse rows
+  const rows: TableRow[] = [];
+  const trElements = findChildrenByName(tbl, 'tr');
+  for (const tr of trElements) {
+    const row = parseTableRow(tr, context);
+    rows.push(row);
+  }
+
+  return {
+    id,
+    type: 'table',
+    bounds,
+    rotation,
+    rows,
+    columnWidths,
+    style,
+  };
+}
+
+/**
+ * Parses table style properties.
+ */
+function parseTableStyle(tblPr: Element | null): TableStyle | undefined {
+  if (!tblPr) return undefined;
+
+  return {
+    firstRow: getAttribute(tblPr, 'firstRow') === '1',
+    lastRow: getAttribute(tblPr, 'lastRow') === '1',
+    firstCol: getAttribute(tblPr, 'firstCol') === '1',
+    lastCol: getAttribute(tblPr, 'lastCol') === '1',
+    bandRow: getAttribute(tblPr, 'bandRow') === '1',
+    bandCol: getAttribute(tblPr, 'bandCol') === '1',
+  };
+}
+
+/**
+ * Parses a table row.
+ */
+function parseTableRow(tr: Element, context: ShapeParseContext): TableRow {
+  const h = getNumberAttribute(tr, 'h', 0);
+  const height = emuToPixels(h);
+
+  const cells: TableCell[] = [];
+  const tcElements = findChildrenByName(tr, 'tc');
+  for (const tc of tcElements) {
+    const cell = parseTableCell(tc, context);
+    cells.push(cell);
+  }
+
+  return { height, cells };
+}
+
+/**
+ * Parses a table cell.
+ */
+function parseTableCell(tc: Element, context: ShapeParseContext): TableCell {
+  const cell: TableCell = {};
+
+  // Parse text content
+  const txBody = findChildByName(tc, 'txBody');
+  if (txBody) {
+    cell.text = parseTextBody(txBody, context.themeColors, context.relationships);
+  }
+
+  // Parse cell properties
+  const tcPr = findChildByName(tc, 'tcPr');
+  if (tcPr) {
+    // Vertical alignment
+    const anchor = getAttribute(tcPr, 'anchor');
+    if (anchor === 'ctr') {
+      cell.verticalAlign = 'middle';
+    } else if (anchor === 'b') {
+      cell.verticalAlign = 'bottom';
+    } else {
+      cell.verticalAlign = 'top';
+    }
+
+    // Cell fill
+    const solidFill = findChildByName(tcPr, 'solidFill');
+    if (solidFill) {
+      const color = parseColorElement(solidFill, context.themeColors);
+      if (color) {
+        cell.fill = { type: 'solid', color };
+      }
+    }
+
+    // Cell borders
+    cell.borders = parseCellBorders(tcPr, context.themeColors);
+  }
+
+  // Column span
+  const gridSpan = getNumberAttribute(tc, 'gridSpan', 1);
+  if (gridSpan > 1) {
+    cell.colSpan = gridSpan;
+  }
+
+  // Row span
+  const rowSpan = getNumberAttribute(tc, 'rowSpan', 1);
+  if (rowSpan > 1) {
+    cell.rowSpan = rowSpan;
+  }
+
+  return cell;
+}
+
+/**
+ * Parses cell border properties.
+ */
+function parseCellBorders(tcPr: Element, themeColors: ThemeColors): CellBorders | undefined {
+  const borders: CellBorders = {};
+  let hasBorders = false;
+
+  const borderNames = ['lnL', 'lnR', 'lnT', 'lnB'] as const;
+  const borderKeys = ['left', 'right', 'top', 'bottom'] as const;
+
+  for (let i = 0; i < borderNames.length; i++) {
+    const ln = findChildByName(tcPr, borderNames[i]);
+    if (ln) {
+      const w = getNumberAttribute(ln, 'w', 12700); // Default 1pt
+      const solidFill = findChildByName(ln, 'solidFill');
+      if (solidFill) {
+        const color = parseColorElement(solidFill, themeColors);
+        if (color) {
+          borders[borderKeys[i]] = {
+            width: emuToPixels(w),
+            color,
+          };
+          hasBorders = true;
+        }
+      }
+    }
+  }
+
+  return hasBorders ? borders : undefined;
 }
 
 /**

@@ -240,6 +240,7 @@ presentation.slides.forEach((slide, index) => {
 
 ### Fully Supported
 
+- **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough
 - **Hyperlinks** - Clickable links in text

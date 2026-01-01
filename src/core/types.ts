@@ -66,12 +66,12 @@ export interface BaseElement {
 /**
  * Discriminator for element types.
  */
-export type ElementType = 'shape' | 'text' | 'image' | 'group';
+export type ElementType = 'shape' | 'text' | 'image' | 'group' | 'table';
 
 /**
  * Union type of all possible slide elements.
  */
-export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement;
+export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement | TableElement;
 
 /**
  * A shape element (rectangle, ellipse, custom path, etc.).
@@ -123,6 +123,75 @@ export interface GroupElement extends BaseElement {
   type: 'group';
   /** Child elements in this group */
   children: SlideElement[];
+}
+
+/**
+ * A table element.
+ */
+export interface TableElement extends BaseElement {
+  type: 'table';
+  /** Table rows */
+  rows: TableRow[];
+  /** Column widths in pixels */
+  columnWidths: number[];
+  /** Table-level styling */
+  style?: TableStyle;
+}
+
+/**
+ * A row in a table.
+ */
+export interface TableRow {
+  /** Row height in pixels */
+  height: number;
+  /** Cells in this row */
+  cells: TableCell[];
+}
+
+/**
+ * A cell in a table.
+ */
+export interface TableCell {
+  /** Text content */
+  text?: TextBody;
+  /** Cell fill */
+  fill?: Fill;
+  /** Cell borders */
+  borders?: CellBorders;
+  /** Number of columns this cell spans */
+  colSpan?: number;
+  /** Number of rows this cell spans */
+  rowSpan?: number;
+  /** Vertical alignment */
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+}
+
+/**
+ * Cell border definitions.
+ */
+export interface CellBorders {
+  top?: Stroke;
+  right?: Stroke;
+  bottom?: Stroke;
+  left?: Stroke;
+}
+
+/**
+ * Table-level styling.
+ */
+export interface TableStyle {
+  /** First row has special styling */
+  firstRow?: boolean;
+  /** Last row has special styling */
+  lastRow?: boolean;
+  /** First column has special styling */
+  firstCol?: boolean;
+  /** Last column has special styling */
+  lastCol?: boolean;
+  /** Alternating row bands */
+  bandRow?: boolean;
+  /** Alternating column bands */
+  bandCol?: boolean;
 }
 
 // ============================================================================

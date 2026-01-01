@@ -10,6 +10,7 @@ import type {
   TextElement,
   ImageElement,
   GroupElement,
+  TableElement,
   Fill,
   Stroke,
   ShapeType,
@@ -17,6 +18,7 @@ import type {
 } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { renderTextBodyToSvg } from './TextRenderer';
+import { renderTable } from './TableRenderer';
 
 /**
  * Unique ID counter for SVG gradients and patterns.
@@ -51,6 +53,9 @@ export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGG
       break;
     case 'group':
       renderGroup(element, group, defs);
+      break;
+    case 'table':
+      renderTableElement(element, group);
       break;
   }
 
@@ -702,4 +707,12 @@ function renderGroup(groupEl: GroupElement, group: SVGGElement, defs: SVGDefsEle
     const childGroup = renderElement(child, defs);
     group.appendChild(childGroup);
   }
+}
+
+/**
+ * Renders a table element.
+ */
+function renderTableElement(tableEl: TableElement, group: SVGGElement): void {
+  const tableFo = renderTable(tableEl);
+  group.appendChild(tableFo);
 }
