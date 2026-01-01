@@ -151,17 +151,69 @@ export interface Bounds {
  * Common shape types supported by PPTX.
  */
 export type ShapeType =
+  // Basic shapes
   | 'rect'
   | 'roundRect'
+  | 'snip1Rect'
+  | 'snip2Rect'
   | 'ellipse'
   | 'triangle'
+  | 'rtTriangle'
   | 'diamond'
   | 'parallelogram'
   | 'trapezoid'
   | 'pentagon'
   | 'hexagon'
+  | 'heptagon'
+  | 'octagon'
+  | 'decagon'
+  | 'dodecagon'
+  // Stars
+  | 'star4'
+  | 'star5'
+  | 'star6'
+  | 'star8'
+  | 'star10'
+  | 'star12'
+  // Arrows
   | 'arrow'
+  | 'leftArrow'
+  | 'rightArrow'
+  | 'upArrow'
+  | 'downArrow'
+  | 'leftRightArrow'
+  | 'upDownArrow'
+  | 'chevron'
+  | 'homePlate'
+  | 'notchedRightArrow'
+  // Callouts
+  | 'wedgeRectCallout'
+  | 'wedgeRoundRectCallout'
+  | 'wedgeEllipseCallout'
+  | 'cloudCallout'
+  // Block shapes
+  | 'cube'
+  | 'can'
+  | 'lightningBolt'
+  | 'heart'
+  | 'sun'
+  | 'moon'
+  | 'cloud'
+  | 'arc'
+  | 'donut'
+  | 'noSmoking'
+  | 'blockArc'
+  | 'foldedCorner'
+  | 'frame'
+  | 'halfFrame'
+  | 'corner'
+  | 'plus'
+  | 'cross'
+  // Lines and connectors
   | 'line'
+  | 'bentConnector3'
+  | 'curvedConnector3'
+  // Other
   | 'custom';
 
 // ============================================================================
