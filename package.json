@@ -11,9 +11,9 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/pptx-viewer.js",
-      "require": "./dist/pptx-viewer.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/pptx-viewer.cjs"
     }
   },
   "files": [
