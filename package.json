@@ -43,6 +43,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": ""
-  }
+    "url": "https://github.com/mdurbar/pptx-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mdurbar/pptx-viewer/issues"
+  },
+  "homepage": "https://github.com/mdurbar/pptx-viewer#readme"
 }
