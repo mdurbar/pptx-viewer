@@ -1,7 +1,7 @@
 {
   "name": "pptx-viewer",
   "version": "0.1.0",
-  "description": "A lightweight, zero-dependency PPTX viewer for the browser",
+  "description": "A lightweight PPTX viewer for the browser with minimal dependencies",
   "author": "",
   "license": "MIT",
   "type": "module",
@@ -17,8 +17,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/*.map"
   ],
+  "sideEffects": false,
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
