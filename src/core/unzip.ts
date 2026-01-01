@@ -6,6 +6,7 @@
  */
 
 import { unzipSync, type Unzipped } from 'fflate';
+import { InvalidFileError, FetchError } from './errors';
 
 /**
  * Represents a file extracted from the PPTX archive.
@@ -93,16 +94,25 @@ export async function extractPPTX(
 
   if (typeof source === 'string') {
     // URL - fetch the file
-    const response = await fetch(source);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PPTX: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(source);
+      if (!response.ok) {
+        throw new FetchError(source, response.status, response.statusText);
+      }
+      const buffer = await response.arrayBuffer();
+      data = new Uint8Array(buffer);
+    } catch (error) {
+      if (error instanceof FetchError) throw error;
+      throw new FetchError(source);
     }
-    const buffer = await response.arrayBuffer();
-    data = new Uint8Array(buffer);
   } else if (source instanceof File) {
     // File object - read as ArrayBuffer
-    const buffer = await source.arrayBuffer();
-    data = new Uint8Array(buffer);
+    try {
+      const buffer = await source.arrayBuffer();
+      data = new Uint8Array(buffer);
+    } catch (error) {
+      throw new InvalidFileError(`Failed to read file: ${source.name}`);
+    }
   } else if (source instanceof ArrayBuffer) {
     // ArrayBuffer - convert to Uint8Array
     data = new Uint8Array(source);
@@ -110,11 +120,27 @@ export async function extractPPTX(
     // Already a Uint8Array
     data = source;
   } else {
-    throw new Error('Invalid source type. Expected File, ArrayBuffer, Uint8Array, or URL string.');
+    throw new InvalidFileError('Invalid source type. Expected File, ArrayBuffer, Uint8Array, or URL string.');
+  }
+
+  // Validate minimum file size (ZIP files need at least 22 bytes for end-of-central-directory)
+  if (data.length < 22) {
+    throw new InvalidFileError('File is too small to be a valid PPTX file');
+  }
+
+  // Check for ZIP magic number (PK\x03\x04)
+  if (data[0] !== 0x50 || data[1] !== 0x4B) {
+    throw new InvalidFileError('File does not appear to be a ZIP/PPTX file (invalid magic number)');
   }
 
   // Extract the ZIP archive
-  const unzipped = unzipSync(data);
+  let unzipped: Unzipped;
+  try {
+    unzipped = unzipSync(data);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new InvalidFileError(`Failed to extract PPTX archive: ${message}`);
+  }
 
   return createArchive(unzipped);
 }

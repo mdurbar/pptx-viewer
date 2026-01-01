@@ -59,34 +59,39 @@ export function parseShapeTree(spTree: Element, context: ShapeParseContext): Sli
   for (const child of Array.from(spTree.children)) {
     const localName = child.localName || child.nodeName.split(':').pop();
 
-    switch (localName) {
-      case 'sp': {
-        const shape = parseShape(child, context);
-        if (shape) elements.push(shape);
-        break;
+    try {
+      switch (localName) {
+        case 'sp': {
+          const shape = parseShape(child, context);
+          if (shape) elements.push(shape);
+          break;
+        }
+        case 'pic': {
+          const image = parsePicture(child, context);
+          if (image) elements.push(image);
+          break;
+        }
+        case 'grpSp': {
+          const group = parseGroup(child, context);
+          if (group) elements.push(group);
+          break;
+        }
+        case 'graphicFrame': {
+          // Charts, tables, SmartArt - try to use fallback image
+          const fallback = parseGraphicFrame(child, context);
+          if (fallback) elements.push(fallback);
+          break;
+        }
+        case 'cxnSp': {
+          // Connector shapes - parse as lines
+          const connector = parseConnector(child, context);
+          if (connector) elements.push(connector);
+          break;
+        }
       }
-      case 'pic': {
-        const image = parsePicture(child, context);
-        if (image) elements.push(image);
-        break;
-      }
-      case 'grpSp': {
-        const group = parseGroup(child, context);
-        if (group) elements.push(group);
-        break;
-      }
-      case 'graphicFrame': {
-        // Charts, tables, SmartArt - try to use fallback image
-        const fallback = parseGraphicFrame(child, context);
-        if (fallback) elements.push(fallback);
-        break;
-      }
-      case 'cxnSp': {
-        // Connector shapes - parse as lines
-        const connector = parseConnector(child, context);
-        if (connector) elements.push(connector);
-        break;
-      }
+    } catch (error) {
+      // Log but don't fail on individual shape parse errors
+      console.warn(`Failed to parse ${localName} element:`, error);
     }
   }
 

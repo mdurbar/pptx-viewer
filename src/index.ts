@@ -98,3 +98,17 @@ export { parsePPTX, isValidPPTX, getSlideCount } from './parser/PPTXParser';
 // Rendering
 export { renderSlide, renderSlideThumbnail, createEmptySlide } from './renderer/SlideRenderer';
 export { renderElement } from './renderer/ShapeRenderer';
+
+// =============================================================================
+// Errors
+// =============================================================================
+
+export {
+  PPTXError,
+  InvalidFileError,
+  MissingFileError,
+  XMLParseError,
+  FetchError,
+  RenderError,
+  isPPTXError,
+} from './core/errors';

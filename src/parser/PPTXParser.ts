@@ -10,6 +10,7 @@
 import type { Presentation, PresentationMetadata, Size, Slide, Theme } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import { PPTX_PATHS, getSlidePath } from '../core/unzip';
+import { MissingFileError, XMLParseError, PPTXError } from '../core/errors';
 import { parseXml, findFirstByName, findChildrenByName, getAttribute, getNumberAttribute } from '../utils/xml';
 import { emuToPixels } from '../utils/units';
 import { parseRelationships, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
@@ -35,18 +36,39 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
   // Parse presentation.xml to get slide order and dimensions
   const presentationXml = archive.getText(PPTX_PATHS.PRESENTATION);
   if (!presentationXml) {
-    throw new Error('Missing presentation.xml');
+    throw new MissingFileError(PPTX_PATHS.PRESENTATION);
   }
 
-  const { slideSize, slideRIds } = parsePresentationXml(presentationXml);
+  let slideSize: Size;
+  let slideRIds: string[];
+
+  try {
+    const result = parsePresentationXml(presentationXml);
+    slideSize = result.slideSize;
+    slideRIds = result.slideRIds;
+  } catch (error) {
+    if (error instanceof PPTXError) throw error;
+    throw new XMLParseError(
+      error instanceof Error ? error.message : 'Unknown error',
+      PPTX_PATHS.PRESENTATION
+    );
+  }
 
   // Parse relationships to get actual slide paths
   const relsXml = archive.getText(PPTX_PATHS.PRESENTATION_RELS);
   if (!relsXml) {
-    throw new Error('Missing presentation relationships');
+    throw new MissingFileError(PPTX_PATHS.PRESENTATION_RELS);
   }
 
-  const relationships = parseRelationships(relsXml);
+  let relationships;
+  try {
+    relationships = parseRelationships(relsXml);
+  } catch (error) {
+    throw new XMLParseError(
+      error instanceof Error ? error.message : 'Unknown error',
+      PPTX_PATHS.PRESENTATION_RELS
+    );
+  }
 
   // Find and parse the theme
   const themeRels = relationships.getByType(RELATIONSHIP_TYPES.THEME);
@@ -55,23 +77,31 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
   if (themeRels.length > 0) {
     const themePath = `ppt/${themeRels[0].target.replace('../', '')}`;
     const themeXml = archive.getText(themePath);
-    theme = themeXml ? parseTheme(themeXml) : createDefaultTheme();
+    try {
+      theme = themeXml ? parseTheme(themeXml) : createDefaultTheme();
+    } catch (error) {
+      // Theme parsing failure is non-fatal, use defaults
+      console.warn(`Failed to parse theme, using defaults:`, error);
+      theme = createDefaultTheme();
+    }
   } else {
     theme = createDefaultTheme();
   }
 
-  // Parse metadata
+  // Parse metadata (non-fatal if it fails)
   const metadata = parseMetadata(archive);
 
   // Parse each slide
   const slides: Slide[] = [];
+  const parseErrors: Array<{ slideIndex: number; error: unknown }> = [];
 
   for (let i = 0; i < slideRIds.length; i++) {
     const rId = slideRIds[i];
     const rel = relationships.get(rId);
 
     if (!rel) {
-      console.warn(`Slide relationship ${rId} not found`);
+      console.warn(`Slide relationship ${rId} not found, skipping slide ${i + 1}`);
+      parseErrors.push({ slideIndex: i, error: new Error(`Relationship ${rId} not found`) });
       continue;
     }
 
@@ -80,12 +110,28 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     const slideXml = archive.getText(slidePath);
 
     if (!slideXml) {
-      console.warn(`Slide file not found: ${slidePath}`);
+      console.warn(`Slide file not found: ${slidePath}, skipping slide ${i + 1}`);
+      parseErrors.push({ slideIndex: i, error: new MissingFileError(slidePath) });
       continue;
     }
 
-    const slide = parseSlide(slideXml, i, archive, theme.colors, slidePath);
-    slides.push(slide);
+    try {
+      const slide = parseSlide(slideXml, i, archive, theme.colors, slidePath);
+      slides.push(slide);
+    } catch (error) {
+      console.warn(`Failed to parse slide ${i + 1}:`, error);
+      parseErrors.push({ slideIndex: i, error });
+      // Create an empty placeholder slide so indices stay consistent
+      slides.push({
+        index: i,
+        elements: [],
+      });
+    }
+  }
+
+  // If no slides could be parsed at all, that's a fatal error
+  if (slides.length === 0 && slideRIds.length > 0) {
+    throw new PPTXError('Failed to parse any slides from the presentation');
   }
 
   return {
@@ -102,11 +148,11 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
 function validateArchive(archive: PPTXArchive): void {
   // Check for required files
   if (!archive.hasFile(PPTX_PATHS.CONTENT_TYPES)) {
-    throw new Error('Invalid PPTX: Missing [Content_Types].xml');
+    throw new MissingFileError(PPTX_PATHS.CONTENT_TYPES);
   }
 
   if (!archive.hasFile(PPTX_PATHS.PRESENTATION)) {
-    throw new Error('Invalid PPTX: Missing presentation.xml');
+    throw new MissingFileError(PPTX_PATHS.PRESENTATION);
   }
 }
 

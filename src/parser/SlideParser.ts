@@ -5,7 +5,7 @@
  * Slides contain a shape tree (spTree) with all visual elements.
  */
 
-import type { Slide, Background, ThemeColors, Fill } from '../core/types';
+import type { Slide, Background, ThemeColors, Fill, SlideElement } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
 import { parseRelationships } from './RelationshipParser';
@@ -13,6 +13,7 @@ import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
 import { parseColorElement } from './TextParser';
 import { parseXml, findFirstByName, findChildByName } from '../utils/xml';
 import { getSlideRelsPath, getMimeType } from '../core/unzip';
+import { XMLParseError } from '../core/errors';
 
 /**
  * Parses a slide XML file.
@@ -31,16 +32,32 @@ export function parseSlide(
   themeColors: ThemeColors,
   slidePath: string
 ): Slide {
-  const doc = parseXml(xmlContent);
+  let doc;
+  try {
+    doc = parseXml(xmlContent);
+  } catch (error) {
+    throw new XMLParseError(
+      error instanceof Error ? error.message : 'Unknown error',
+      slidePath
+    );
+  }
+
   const root = doc.documentElement;
 
-  // Load slide relationships
+  // Load slide relationships (non-fatal if missing)
   const slideNumber = slideIndex + 1;
   const relsPath = getSlideRelsPath(slideNumber);
   const relsXml = archive.getText(relsPath);
-  const relationships = relsXml
-    ? parseRelationships(relsXml)
-    : createEmptyRelationshipMap();
+  let relationships: RelationshipMap;
+
+  try {
+    relationships = relsXml
+      ? parseRelationships(relsXml)
+      : createEmptyRelationshipMap();
+  } catch (error) {
+    console.warn(`Failed to parse relationships for slide ${slideNumber}:`, error);
+    relationships = createEmptyRelationshipMap();
+  }
 
   // Create parsing context
   const context: ShapeParseContext = {
@@ -50,15 +67,25 @@ export function parseSlide(
     basePath: slidePath,
   };
 
-  // Parse background
-  const background = parseSlideBackground(root, context);
+  // Parse background (non-fatal if it fails)
+  let background: Background | undefined;
+  try {
+    background = parseSlideBackground(root, context);
+  } catch (error) {
+    console.warn(`Failed to parse background for slide ${slideNumber}:`, error);
+  }
 
   // Find the shape tree
   const cSld = findFirstByName(root, 'cSld');
   const spTree = cSld ? findFirstByName(cSld, 'spTree') : null;
 
-  // Parse elements
-  const elements = spTree ? parseShapeTree(spTree, context) : [];
+  // Parse elements (with error recovery for individual shapes)
+  let elements: SlideElement[] = [];
+  try {
+    elements = spTree ? parseShapeTree(spTree, context) : [];
+  } catch (error) {
+    console.warn(`Failed to parse shapes for slide ${slideNumber}:`, error);
+  }
 
   return {
     index: slideIndex,

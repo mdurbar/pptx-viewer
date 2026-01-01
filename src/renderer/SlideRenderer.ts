@@ -7,6 +7,7 @@
 import type { Slide, Size, Fill } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { renderElement } from './ShapeRenderer';
+import { RenderError } from '../core/errors';
 
 /**
  * Options for rendering a slide.
@@ -56,19 +57,30 @@ export function renderSlide(
   bgRect.setAttribute('width', String(slideSize.width));
   bgRect.setAttribute('height', String(slideSize.height));
 
-  if (slide.background?.fill) {
-    applyBackgroundFill(bgRect, slide.background.fill, defs);
-  } else {
-    // Default white background
+  try {
+    if (slide.background?.fill) {
+      applyBackgroundFill(bgRect, slide.background.fill, defs);
+    } else {
+      // Default white background
+      bgRect.setAttribute('fill', '#FFFFFF');
+    }
+  } catch (error) {
+    // Fall back to white background on error
+    console.warn('Failed to render background:', error);
     bgRect.setAttribute('fill', '#FFFFFF');
   }
 
   svg.appendChild(bgRect);
 
-  // Render elements
+  // Render elements with error recovery
   for (const element of slide.elements) {
-    const elementGroup = renderElement(element, defs);
-    svg.appendChild(elementGroup);
+    try {
+      const elementGroup = renderElement(element, defs);
+      svg.appendChild(elementGroup);
+    } catch (error) {
+      // Log but don't fail on individual element render errors
+      console.warn(`Failed to render element ${element.id}:`, error);
+    }
   }
 
   return svg;
