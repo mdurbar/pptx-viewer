@@ -116,8 +116,9 @@ function parseParagraph(
   const lineSpacing = parseLineSpacing(pPr);
   const spaceBefore = parseSpacing(pPr, 'spcBef');
   const spaceAfter = parseSpacing(pPr, 'spcAft');
-  const bullet = parseBullet(pPr);
+  const bullet = parseBullet(pPr, themeColors);
   const level = getNumberAttribute(pPr || pElement, 'lvl', 0);
+  const { marginLeft, indent } = parseIndentation(pPr);
 
   // Parse runs
   const rElements = findChildrenByName(pElement, 'r');
@@ -149,6 +150,8 @@ function parseParagraph(
     spaceAfter,
     bullet,
     level,
+    marginLeft,
+    indent,
   };
 }
 
@@ -228,17 +231,19 @@ function parseSpacing(pPr: Element | null, elementName: string): number | undefi
 /**
  * Parses bullet point style.
  */
-function parseBullet(pPr: Element | null): BulletStyle | undefined {
+function parseBullet(pPr: Element | null, themeColors: ThemeColors): BulletStyle | undefined {
   if (!pPr) return undefined;
 
   // Check for no bullet
   const buNone = findChildByName(pPr, 'buNone');
   if (buNone) return undefined;
 
+  let bullet: BulletStyle | undefined;
+
   // Check for character bullet
   const buChar = findChildByName(pPr, 'buChar');
   if (buChar) {
-    return {
+    bullet = {
       type: 'bullet',
       char: getAttribute(buChar, 'char') || '•',
     };
@@ -248,13 +253,69 @@ function parseBullet(pPr: Element | null): BulletStyle | undefined {
   const buAutoNum = findChildByName(pPr, 'buAutoNum');
   if (buAutoNum) {
     const startAt = getNumberAttribute(buAutoNum, 'startAt', 1);
-    return {
+    const numberType = getAttribute(buAutoNum, 'type') || 'arabicPeriod';
+    bullet = {
       type: 'number',
       startAt,
+      numberType,
     };
   }
 
-  return undefined;
+  // If no bullet type found, return undefined
+  if (!bullet) return undefined;
+
+  // Parse bullet color
+  const buClr = findChildByName(pPr, 'buClr');
+  if (buClr) {
+    const color = parseColorElement(buClr, themeColors);
+    if (color) {
+      bullet.color = color;
+    }
+  }
+
+  // Parse bullet font
+  const buFont = findChildByName(pPr, 'buFont');
+  if (buFont) {
+    const typeface = getAttribute(buFont, 'typeface');
+    if (typeface) {
+      bullet.font = typeface;
+    }
+  }
+
+  // Parse bullet size
+  const buSzPct = findChildByName(pPr, 'buSzPct');
+  if (buSzPct) {
+    const val = getNumberAttribute(buSzPct, 'val', 100000);
+    bullet.sizePercent = val / 1000; // Convert from 1000ths to percentage
+  }
+
+  return bullet;
+}
+
+/**
+ * Parses paragraph indentation (left margin and first line indent).
+ */
+function parseIndentation(pPr: Element | null): { marginLeft?: number; indent?: number } {
+  if (!pPr) return {};
+
+  const result: { marginLeft?: number; indent?: number } = {};
+
+  // Left margin (marL) in EMUs
+  const marL = getNumberAttribute(pPr, 'marL', 0);
+  if (marL > 0) {
+    result.marginLeft = emuToPixels(marL);
+  }
+
+  // First line indent (indent) in EMUs - negative for hanging indent
+  const indentAttr = getAttribute(pPr, 'indent');
+  if (indentAttr) {
+    const indentVal = parseInt(indentAttr, 10);
+    if (!isNaN(indentVal)) {
+      result.indent = emuToPixels(indentVal);
+    }
+  }
+
+  return result;
 }
 
 /**

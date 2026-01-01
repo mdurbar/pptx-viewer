@@ -398,6 +398,10 @@ export interface Paragraph {
   bullet?: BulletStyle;
   /** Indentation level (for lists) */
   level?: number;
+  /** Left margin in pixels */
+  marginLeft?: number;
+  /** First line indent (negative for hanging indent) */
+  indent?: number;
 }
 
 /**
@@ -433,6 +437,14 @@ export interface BulletStyle {
   char?: string;
   /** Starting number for numbered lists */
   startAt?: number;
+  /** Number format type (e.g., 'arabicPeriod', 'alphaLcParenR') */
+  numberType?: string;
+  /** Bullet color */
+  color?: Color;
+  /** Bullet font family */
+  font?: string;
+  /** Bullet size as percentage of text size (e.g., 100 = same size) */
+  sizePercent?: number;
 }
 
 // ============================================================================

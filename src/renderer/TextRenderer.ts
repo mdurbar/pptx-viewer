@@ -4,8 +4,18 @@
  * Converts parsed TextBody into HTML elements with proper styling.
  */
 
-import type { TextBody, Paragraph, TextRun, Color } from '../core/types';
+import type { TextBody, Paragraph, TextRun, Color, BulletStyle } from '../core/types';
 import { colorToCss } from '../utils/color';
+
+/**
+ * Tracks numbering state for lists across paragraphs.
+ */
+interface NumberingState {
+  /** Current number for each level */
+  numbers: Map<number, number>;
+  /** Last bullet type seen at each level */
+  lastBulletType: Map<number, string>;
+}
 
 /**
  * Renders a text body to HTML.
@@ -38,9 +48,15 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
     container.style.padding = `${text.padding.top}px ${text.padding.right}px ${text.padding.bottom}px ${text.padding.left}px`;
   }
 
+  // Track numbering state across paragraphs
+  const numberingState: NumberingState = {
+    numbers: new Map(),
+    lastBulletType: new Map(),
+  };
+
   // Render paragraphs
   for (const paragraph of text.paragraphs) {
-    const pElement = renderParagraph(paragraph);
+    const pElement = renderParagraph(paragraph, numberingState);
     container.appendChild(pElement);
   }
 }
@@ -48,24 +64,23 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
 /**
  * Renders a paragraph to HTML.
  */
-function renderParagraph(paragraph: Paragraph): HTMLElement {
+function renderParagraph(paragraph: Paragraph, numberingState: NumberingState): HTMLElement {
   const p = document.createElement('p');
   p.style.margin = '0';
   p.style.padding = '0';
+  p.style.display = 'flex';
+  p.style.alignItems = 'baseline';
 
   // Apply alignment
   switch (paragraph.align) {
     case 'center':
-      p.style.textAlign = 'center';
+      p.style.justifyContent = 'center';
       break;
     case 'right':
-      p.style.textAlign = 'right';
-      break;
-    case 'justify':
-      p.style.textAlign = 'justify';
+      p.style.justifyContent = 'flex-end';
       break;
     default:
-      p.style.textAlign = 'left';
+      p.style.justifyContent = 'flex-start';
   }
 
   // Apply line spacing
@@ -81,38 +96,166 @@ function renderParagraph(paragraph: Paragraph): HTMLElement {
     p.style.marginBottom = `${paragraph.spaceAfter}px`;
   }
 
-  // Apply indentation for lists
-  if (paragraph.level && paragraph.level > 0) {
-    p.style.marginLeft = `${paragraph.level * 24}px`;
+  // Calculate indentation
+  const level = paragraph.level || 0;
+  let leftMargin = paragraph.marginLeft ?? (level * 36); // Default 36px per level
+  const hangingIndent = paragraph.indent ?? (paragraph.bullet ? -18 : 0); // Default hanging indent for bullets
+
+  // Apply left margin
+  if (leftMargin > 0) {
+    p.style.marginLeft = `${leftMargin}px`;
   }
 
   // Add bullet point
   if (paragraph.bullet) {
     const bulletSpan = document.createElement('span');
-    bulletSpan.style.marginRight = '8px';
+    bulletSpan.style.flexShrink = '0';
+    bulletSpan.style.display = 'inline-block';
+
+    // Apply hanging indent width to bullet
+    const bulletWidth = Math.abs(hangingIndent) || 18;
+    bulletSpan.style.width = `${bulletWidth}px`;
+    bulletSpan.style.marginLeft = hangingIndent < 0 ? `${hangingIndent}px` : '0';
+    bulletSpan.style.textAlign = 'left';
+
+    // Apply bullet styling
+    if (paragraph.bullet.font) {
+      bulletSpan.style.fontFamily = `"${paragraph.bullet.font}", sans-serif`;
+    }
+    if (paragraph.bullet.color) {
+      bulletSpan.style.color = colorToCss(paragraph.bullet.color);
+    }
+    if (paragraph.bullet.sizePercent) {
+      bulletSpan.style.fontSize = `${paragraph.bullet.sizePercent}%`;
+    }
 
     if (paragraph.bullet.type === 'bullet') {
       bulletSpan.textContent = paragraph.bullet.char || '•';
+      // Reset numbering when we see a bullet
+      numberingState.numbers.delete(level);
     } else {
-      // Numbered - would need to track across paragraphs for proper numbering
-      bulletSpan.textContent = `${paragraph.bullet.startAt || 1}.`;
+      // Numbered list - track and increment
+      const bulletKey = `${level}-${paragraph.bullet.numberType || 'arabicPeriod'}`;
+      const lastType = numberingState.lastBulletType.get(level);
+
+      // Reset if bullet type changed or starting new list
+      if (lastType !== bulletKey) {
+        numberingState.numbers.set(level, paragraph.bullet.startAt || 1);
+        numberingState.lastBulletType.set(level, bulletKey);
+      }
+
+      const currentNumber = numberingState.numbers.get(level) || paragraph.bullet.startAt || 1;
+      bulletSpan.textContent = formatBulletNumber(currentNumber, paragraph.bullet.numberType);
+
+      // Increment for next paragraph
+      numberingState.numbers.set(level, currentNumber + 1);
+
+      // Reset deeper levels
+      for (const [l] of numberingState.numbers) {
+        if (l > level) {
+          numberingState.numbers.delete(l);
+          numberingState.lastBulletType.delete(l);
+        }
+      }
     }
 
     p.appendChild(bulletSpan);
   }
 
+  // Create a wrapper for text content
+  const textWrapper = document.createElement('span');
+  textWrapper.style.flex = '1';
+  textWrapper.style.minWidth = '0'; // Allow text to shrink
+
   // Render text runs
   for (const run of paragraph.runs) {
     const runElement = renderTextRun(run);
-    p.appendChild(runElement);
+    textWrapper.appendChild(runElement);
   }
 
   // Empty paragraph - add a line break to maintain height
-  if (paragraph.runs.length === 0) {
-    p.innerHTML = '&nbsp;';
+  if (paragraph.runs.length === 0 && !paragraph.bullet) {
+    textWrapper.innerHTML = '&nbsp;';
   }
 
+  p.appendChild(textWrapper);
+
   return p;
+}
+
+/**
+ * Formats a number according to the bullet number type.
+ */
+function formatBulletNumber(num: number, numberType?: string): string {
+  switch (numberType) {
+    case 'alphaLcParenBoth':
+      return `(${toAlpha(num, false)})`;
+    case 'alphaLcParenR':
+      return `${toAlpha(num, false)})`;
+    case 'alphaLcPeriod':
+      return `${toAlpha(num, false)}.`;
+    case 'alphaUcParenBoth':
+      return `(${toAlpha(num, true)})`;
+    case 'alphaUcParenR':
+      return `${toAlpha(num, true)})`;
+    case 'alphaUcPeriod':
+      return `${toAlpha(num, true)}.`;
+    case 'arabicParenBoth':
+      return `(${num})`;
+    case 'arabicParenR':
+      return `${num})`;
+    case 'arabicPeriod':
+    case 'arabic':
+    default:
+      return `${num}.`;
+    case 'arabicPlain':
+      return `${num}`;
+    case 'romanLcParenBoth':
+      return `(${toRoman(num, false)})`;
+    case 'romanLcParenR':
+      return `${toRoman(num, false)})`;
+    case 'romanLcPeriod':
+      return `${toRoman(num, false)}.`;
+    case 'romanUcParenBoth':
+      return `(${toRoman(num, true)})`;
+    case 'romanUcParenR':
+      return `${toRoman(num, true)})`;
+    case 'romanUcPeriod':
+      return `${toRoman(num, true)}.`;
+  }
+}
+
+/**
+ * Converts a number to alphabetic representation (a, b, c, ... z, aa, ab, ...).
+ */
+function toAlpha(num: number, uppercase: boolean): string {
+  let result = '';
+  while (num > 0) {
+    num--;
+    result = String.fromCharCode((num % 26) + (uppercase ? 65 : 97)) + result;
+    num = Math.floor(num / 26);
+  }
+  return result || (uppercase ? 'A' : 'a');
+}
+
+/**
+ * Converts a number to Roman numeral representation.
+ */
+function toRoman(num: number, uppercase: boolean): string {
+  const romanNumerals = [
+    ['M', 1000], ['CM', 900], ['D', 500], ['CD', 400],
+    ['C', 100], ['XC', 90], ['L', 50], ['XL', 40],
+    ['X', 10], ['IX', 9], ['V', 5], ['IV', 4], ['I', 1]
+  ] as const;
+
+  let result = '';
+  for (const [letter, value] of romanNumerals) {
+    while (num >= value) {
+      result += letter;
+      num -= value;
+    }
+  }
+  return uppercase ? result : result.toLowerCase();
 }
 
 /**
