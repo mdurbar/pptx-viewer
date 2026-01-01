@@ -84,6 +84,13 @@ export type {
   ThemeColors,
   ThemeFonts,
 
+  // Slide Masters & Layouts
+  SlideMaster,
+  SlideLayout,
+  PlaceholderType,
+  PlaceholderInfo,
+  ColorMap,
+
   // Viewer
   ViewerOptions,
   ViewerEvents,
@@ -101,7 +108,7 @@ export { extractPPTX, type PPTXArchive } from './core/unzip';
 export { parsePPTX, isValidPPTX, getSlideCount } from './parser/PPTXParser';
 
 // Rendering
-export { renderSlide, renderSlideThumbnail, createEmptySlide } from './renderer/SlideRenderer';
+export { renderSlide, renderSlideWithInheritance, renderSlideThumbnail, createEmptySlide } from './renderer/SlideRenderer';
 export { renderElement } from './renderer/ShapeRenderer';
 
 // =============================================================================

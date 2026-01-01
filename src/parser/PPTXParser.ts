@@ -7,7 +7,7 @@
  * - Individual slides
  */
 
-import type { Presentation, PresentationMetadata, Size, Slide, Theme } from '../core/types';
+import type { Presentation, PresentationMetadata, Size, Slide, Theme, SlideMaster, SlideLayout } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import { PPTX_PATHS, getSlidePath } from '../core/unzip';
 import { MissingFileError, XMLParseError, PPTXError } from '../core/errors';
@@ -16,6 +16,8 @@ import { emuToPixels } from '../utils/units';
 import { parseRelationships, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
 import { parseTheme, createDefaultTheme } from './ThemeParser';
 import { parseSlide } from './SlideParser';
+import { parseSlideMaster } from './MasterParser';
+import { parseSlideLayout } from './LayoutParser';
 
 /**
  * Parses a PPTX archive into a Presentation object.
@@ -88,6 +90,57 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     theme = createDefaultTheme();
   }
 
+  // Parse slide masters
+  const slideMasters = new Map<string, SlideMaster>();
+  const masterRels = relationships.getByType(RELATIONSHIP_TYPES.SLIDE_MASTER);
+
+  for (const masterRel of masterRels) {
+    try {
+      const masterPath = `ppt/${masterRel.target.replace('../', '')}`;
+      const masterXml = archive.getText(masterPath);
+      if (masterXml) {
+        const master = parseSlideMaster(masterXml, masterRel.id, archive, theme.colors, masterPath);
+        slideMasters.set(masterRel.id, master);
+      }
+    } catch (error) {
+      console.warn(`Failed to parse slide master ${masterRel.id}:`, error);
+    }
+  }
+
+  // Parse slide layouts (via master relationships)
+  const slideLayouts = new Map<string, SlideLayout>();
+
+  for (const [, master] of slideMasters) {
+    // Get the master's relationships file to resolve layout paths
+    const masterPath = `ppt/slideMasters/slideMaster${getNumberFromPath(relationships.get(master.id)?.target || '')}.xml`;
+    const masterRelsPath = masterPath.replace('slideMasters/', 'slideMasters/_rels/') + '.rels';
+    const masterRelsXml = archive.getText(masterRelsPath);
+
+    if (masterRelsXml) {
+      try {
+        const masterRelationships = parseRelationships(masterRelsXml);
+
+        for (const layoutId of master.layoutIds) {
+          const layoutRel = masterRelationships.get(layoutId);
+          if (layoutRel) {
+            const layoutPath = `ppt/slideLayouts/${layoutRel.target.replace('../slideLayouts/', '')}`;
+            const layoutXml = archive.getText(layoutPath);
+            if (layoutXml) {
+              try {
+                const layout = parseSlideLayout(layoutXml, layoutId, archive, theme.colors, layoutPath);
+                slideLayouts.set(layoutId, layout);
+              } catch (error) {
+                console.warn(`Failed to parse slide layout ${layoutId}:`, error);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to parse master relationships:`, error);
+      }
+    }
+  }
+
   // Parse metadata (non-fatal if it fails)
   const metadata = parseMetadata(archive);
 
@@ -139,6 +192,8 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     slideSize,
     slides,
     theme,
+    slideMasters,
+    slideLayouts,
   };
 }
 
@@ -268,4 +323,12 @@ export function getSlideCount(archive: PPTXArchive): number {
   } catch {
     return 0;
   }
+}
+
+/**
+ * Extracts a number from a file path like "slideMaster1.xml" -> 1
+ */
+function getNumberFromPath(path: string): number {
+  const match = path.match(/(\d+)\.xml$/);
+  return match ? parseInt(match[1], 10) : 1;
 }

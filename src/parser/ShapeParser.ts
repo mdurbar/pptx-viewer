@@ -27,6 +27,8 @@ import type {
   Color,
   GradientStop,
   ThemeColors,
+  PlaceholderInfo,
+  PlaceholderType,
 } from '../core/types';
 import type { RelationshipMap } from './RelationshipParser';
 import type { PPTXArchive } from '../core/unzip';
@@ -112,6 +114,9 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
   const cNvPr = nvSpPr ? findChildByName(nvSpPr, 'cNvPr') : null;
   const id = (cNvPr ? getAttribute(cNvPr, 'id') : null) || generateId();
 
+  // Extract placeholder info (for slide master/layout inheritance)
+  const placeholder = parsePlaceholderInfo(nvSpPr);
+
   // Get shape properties
   const spPr = findChildByName(sp, 'spPr');
   if (!spPr) return null;
@@ -149,6 +154,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
       bounds,
       rotation,
       text: text!,
+      placeholder,
     };
   }
 
@@ -161,6 +167,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
     fill,
     stroke,
     text,
+    placeholder,
   };
 }
 
@@ -792,6 +799,30 @@ function parseStroke(spPr: Element, themeColors: ThemeColors): Stroke | undefine
     width,
     dashStyle,
   };
+}
+
+/**
+ * Parses placeholder information from non-visual shape properties.
+ * Placeholders are used for slide master/layout inheritance.
+ */
+function parsePlaceholderInfo(nvSpPr: Element | null): PlaceholderInfo | undefined {
+  if (!nvSpPr) return undefined;
+
+  const nvPr = findChildByName(nvSpPr, 'nvPr');
+  if (!nvPr) return undefined;
+
+  const ph = findChildByName(nvPr, 'ph');
+  if (!ph) return undefined;
+
+  // Get placeholder type (defaults to 'body' if not specified)
+  const typeAttr = getAttribute(ph, 'type');
+  const type = (typeAttr || 'body') as PlaceholderType;
+
+  // Get placeholder index (for matching with layout/master)
+  const idxAttr = getAttribute(ph, 'idx');
+  const idx = idxAttr ? parseInt(idxAttr, 10) : undefined;
+
+  return { type, idx };
 }
 
 /**

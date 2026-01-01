@@ -4,10 +4,9 @@
  * Orchestrates rendering of backgrounds and all slide elements.
  */
 
-import type { Slide, Size, Fill } from '../core/types';
+import type { Slide, Size, Fill, SlideLayout, SlideMaster, Background, SlideElement } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { renderElement } from './ShapeRenderer';
-import { RenderError } from '../core/errors';
 
 /**
  * Options for rendering a slide.
@@ -84,6 +83,148 @@ export function renderSlide(
   }
 
   return svg;
+}
+
+/**
+ * Renders a slide with full master/layout inheritance.
+ *
+ * This function implements proper layering:
+ * 1. Background (resolved from slide → layout → master)
+ * 2. Master shapes (if showMasterShapes is true)
+ * 3. Layout shapes (non-placeholder elements)
+ * 4. Slide content
+ *
+ * @param slide - The slide to render
+ * @param slideSize - Original slide dimensions
+ * @param layout - Optional slide layout
+ * @param master - Optional slide master
+ * @param options - Rendering options
+ * @returns SVG element containing the rendered slide
+ */
+export function renderSlideWithInheritance(
+  slide: Slide,
+  slideSize: Size,
+  layout?: SlideLayout,
+  master?: SlideMaster,
+  options: SlideRenderOptions = {}
+): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
+  // Set viewBox to original slide size for proper scaling
+  svg.setAttribute('viewBox', `0 0 ${slideSize.width} ${slideSize.height}`);
+
+  // Set display size
+  if (options.width) {
+    svg.setAttribute('width', String(options.width));
+  }
+  if (options.height) {
+    svg.setAttribute('height', String(options.height));
+  }
+
+  // Preserve aspect ratio
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  // Create defs for gradients/patterns
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  svg.appendChild(defs);
+
+  // LAYER 1: Background (resolved from inheritance chain)
+  const resolvedBackground = resolveBackground(slide, layout, master);
+  const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bgRect.setAttribute('width', String(slideSize.width));
+  bgRect.setAttribute('height', String(slideSize.height));
+
+  try {
+    if (resolvedBackground?.fill) {
+      applyBackgroundFill(bgRect, resolvedBackground.fill, defs);
+    } else {
+      bgRect.setAttribute('fill', '#FFFFFF');
+    }
+  } catch (error) {
+    console.warn('Failed to render background:', error);
+    bgRect.setAttribute('fill', '#FFFFFF');
+  }
+  svg.appendChild(bgRect);
+
+  // LAYER 2: Master shapes (if layout allows)
+  if (master && (layout?.showMasterShapes !== false)) {
+    const masterGroup = createLayerGroup('master-shapes');
+    renderElementsToGroup(master.elements, masterGroup, defs, true);
+    svg.appendChild(masterGroup);
+  }
+
+  // LAYER 3: Layout shapes (non-placeholder elements only)
+  if (layout) {
+    const layoutGroup = createLayerGroup('layout-shapes');
+    renderElementsToGroup(layout.elements, layoutGroup, defs, true);
+    svg.appendChild(layoutGroup);
+  }
+
+  // LAYER 4: Slide content
+  const contentGroup = createLayerGroup('slide-content');
+  renderElementsToGroup(slide.elements, contentGroup, defs, false);
+  svg.appendChild(contentGroup);
+
+  return svg;
+}
+
+/**
+ * Resolves background from inheritance chain.
+ * Priority: Slide > Layout > Master
+ */
+function resolveBackground(
+  slide: Slide,
+  layout?: SlideLayout,
+  master?: SlideMaster
+): Background | undefined {
+  // Slide's own background takes priority
+  if (slide.background) {
+    return slide.background;
+  }
+  // Then layout background
+  if (layout?.background) {
+    return layout.background;
+  }
+  // Finally master background
+  if (master?.background) {
+    return master.background;
+  }
+  return undefined;
+}
+
+/**
+ * Creates a group element for layering.
+ */
+function createLayerGroup(name: string): SVGGElement {
+  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  group.setAttribute('data-layer', name);
+  return group;
+}
+
+/**
+ * Renders elements to a group.
+ * @param skipPlaceholders - If true, skip elements that are placeholders (for master/layout layers)
+ */
+function renderElementsToGroup(
+  elements: SlideElement[],
+  group: SVGGElement,
+  defs: SVGDefsElement,
+  skipPlaceholders: boolean
+): void {
+  for (const element of elements) {
+    // Skip placeholder shapes in master/layout layers
+    // They define positions but actual content comes from slides
+    if (skipPlaceholders && element.placeholder) {
+      continue;
+    }
+
+    try {
+      const elementGroup = renderElement(element, defs);
+      group.appendChild(elementGroup);
+    } catch (error) {
+      console.warn(`Failed to render element ${element.id}:`, error);
+    }
+  }
 }
 
 /**

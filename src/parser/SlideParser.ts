@@ -8,7 +8,7 @@
 import type { Slide, Background, ThemeColors, Fill, SlideElement } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
-import { parseRelationships } from './RelationshipParser';
+import { parseRelationships, RELATIONSHIP_TYPES } from './RelationshipParser';
 import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
 import { parseColorElement } from './TextParser';
 import { parseXml, findFirstByName, findChildByName } from '../utils/xml';
@@ -87,11 +87,26 @@ export function parseSlide(
     console.warn(`Failed to parse shapes for slide ${slideNumber}:`, error);
   }
 
+  // Get the layout relationship ID for this slide
+  const layoutId = getSlideLayoutId(relationships);
+
   return {
     index: slideIndex,
     background,
     elements,
+    layoutId,
   };
+}
+
+/**
+ * Gets the layout relationship ID for a slide.
+ */
+function getSlideLayoutId(relationships: RelationshipMap): string | undefined {
+  const layoutRels = relationships.getByType(RELATIONSHIP_TYPES.SLIDE_LAYOUT);
+  if (layoutRels.length > 0) {
+    return layoutRels[0].id;
+  }
+  return undefined;
 }
 
 /**

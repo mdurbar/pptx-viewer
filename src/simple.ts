@@ -5,10 +5,10 @@
  * the full PPTXViewer component and want to handle rendering themselves.
  */
 
-import type { Presentation } from './core/types';
+import type { Presentation, Slide, SlideLayout, SlideMaster } from './core/types';
 import { extractPPTX, type PPTXArchive } from './core/unzip';
 import { parsePPTX } from './parser/PPTXParser';
-import { renderSlide } from './renderer/SlideRenderer';
+import { renderSlide, renderSlideWithInheritance } from './renderer/SlideRenderer';
 
 /**
  * Holds a loaded presentation and its archive for cleanup.
@@ -117,11 +117,39 @@ export function renderSlideToElement(
     width = height * slideAspectRatio;
   }
 
-  // Render slide
+  // Get slide with layout and master for inheritance
   const slide = presentation.slides[slideIndex];
-  const svg = renderSlide(slide, presentation.slideSize, { width, height });
+  const { layout, master } = getSlideInheritance(presentation, slide);
+
+  // Render slide with inheritance
+  const svg = renderSlideWithInheritance(slide, presentation.slideSize, layout, master, { width, height });
 
   container.appendChild(svg);
+}
+
+/**
+ * Gets the layout and master for a slide.
+ */
+function getSlideInheritance(
+  presentation: Presentation,
+  slide: Slide
+): { layout?: SlideLayout; master?: SlideMaster } {
+  let layout: SlideLayout | undefined;
+  let master: SlideMaster | undefined;
+
+  if (slide.layoutId) {
+    layout = presentation.slideLayouts.get(slide.layoutId);
+    if (layout?.masterId) {
+      master = presentation.slideMasters.get(layout.masterId);
+    }
+  }
+
+  // If no layout, try to find a default master
+  if (!master && presentation.slideMasters.size > 0) {
+    master = presentation.slideMasters.values().next().value;
+  }
+
+  return { layout, master };
 }
 
 /**
@@ -160,9 +188,12 @@ export async function renderSlideToCanvas(
     throw new Error('Could not get canvas 2D context');
   }
 
-  // Render to SVG first
+  // Get slide with layout and master for inheritance
   const slide = presentation.slides[slideIndex];
-  const svg = renderSlide(slide, presentation.slideSize, {
+  const { layout, master } = getSlideInheritance(presentation, slide);
+
+  // Render to SVG first
+  const svg = renderSlideWithInheritance(slide, presentation.slideSize, layout, master, {
     width: canvas.width,
     height: canvas.height,
   });
@@ -221,10 +252,11 @@ export function getThumbnails(
   const aspectRatio = presentation.slideSize.height / presentation.slideSize.width;
   const thumbnailHeight = thumbnailWidth * aspectRatio;
 
-  return presentation.slides.map((slide) =>
-    renderSlide(slide, presentation.slideSize, {
+  return presentation.slides.map((slide) => {
+    const { layout, master } = getSlideInheritance(presentation, slide);
+    return renderSlideWithInheritance(slide, presentation.slideSize, layout, master, {
       width: thumbnailWidth,
       height: thumbnailHeight,
-    })
-  );
+    });
+  });
 }

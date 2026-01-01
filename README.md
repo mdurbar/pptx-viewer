@@ -240,6 +240,7 @@ presentation.slides.forEach((slide, index) => {
 
 ### Fully Supported
 
+- **Slide masters & layouts** - Background and element inheritance from masters and layouts
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough
@@ -313,11 +314,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Areas for Contribution
 
-- Table support
-- Slide master/layout inheritance
-- Better text rendering fidelity
+- Better text rendering fidelity (bullet/list rendering)
 - Performance optimizations
 - Additional shape types and effects
+- Shadow effects
 
 ## License
 

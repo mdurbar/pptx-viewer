@@ -19,6 +19,10 @@ export interface Presentation {
   slides: Slide[];
   /** Theme information (colors, fonts) */
   theme: Theme;
+  /** Slide masters indexed by relationship ID */
+  slideMasters: Map<string, SlideMaster>;
+  /** Slide layouts indexed by relationship ID */
+  slideLayouts: Map<string, SlideLayout>;
 }
 
 /**
@@ -43,6 +47,8 @@ export interface Slide {
   elements: SlideElement[];
   /** Notes for this slide */
   notes?: string;
+  /** Layout relationship ID (for inheritance) */
+  layoutId?: string;
 }
 
 // ============================================================================
@@ -61,6 +67,8 @@ export interface BaseElement {
   bounds: Bounds;
   /** Rotation in degrees */
   rotation?: number;
+  /** Placeholder info (if this element is a placeholder) */
+  placeholder?: PlaceholderInfo;
 }
 
 /**
@@ -476,6 +484,108 @@ export interface ThemeFonts {
   major: string;
   /** Minor font (body text) */
   minor: string;
+}
+
+// ============================================================================
+// Slide Masters & Layouts
+// ============================================================================
+
+/**
+ * Placeholder type from OOXML ph@type attribute.
+ */
+export type PlaceholderType =
+  | 'ctrTitle'   // Center title
+  | 'title'      // Title
+  | 'body'       // Body text
+  | 'subTitle'   // Subtitle
+  | 'dt'         // Date/time
+  | 'ftr'        // Footer
+  | 'sldNum'     // Slide number
+  | 'hdr'        // Header
+  | 'pic'        // Picture
+  | 'chart'      // Chart
+  | 'tbl'        // Table
+  | 'dgm'        // Diagram/SmartArt
+  | 'media'      // Media
+  | 'clipArt'    // Clip art
+  | 'obj';       // Generic object
+
+/**
+ * Placeholder information for an element.
+ */
+export interface PlaceholderInfo {
+  /** Placeholder type */
+  type: PlaceholderType;
+  /** Placeholder index (for matching with layout) */
+  idx?: number;
+}
+
+/**
+ * Color mapping from scheme colors to theme colors.
+ * Maps logical color names to theme color slots.
+ */
+export interface ColorMap {
+  /** Background 1 */
+  bg1?: string;
+  /** Background 2 */
+  bg2?: string;
+  /** Text 1 */
+  tx1?: string;
+  /** Text 2 */
+  tx2?: string;
+  /** Accent colors 1-6 */
+  accent1?: string;
+  accent2?: string;
+  accent3?: string;
+  accent4?: string;
+  accent5?: string;
+  accent6?: string;
+  /** Hyperlink */
+  hlink?: string;
+  /** Followed hyperlink */
+  folHlink?: string;
+}
+
+/**
+ * Represents a slide layout.
+ * Layouts define placeholder positions and can override master properties.
+ */
+export interface SlideLayout {
+  /** Layout relationship ID */
+  id: string;
+  /** Layout name */
+  name?: string;
+  /** Layout type (e.g., "title", "obj", "twoObj") */
+  type?: string;
+  /** Parent master relationship ID */
+  masterId: string;
+  /** Background override (if different from master) */
+  background?: Background;
+  /** Layout-specific elements and placeholders */
+  elements: SlideElement[];
+  /** Whether to show master shapes on slides using this layout */
+  showMasterShapes: boolean;
+  /** Color map overrides */
+  colorMap?: ColorMap;
+}
+
+/**
+ * Represents a slide master.
+ * Masters define the base styling for all slides using them.
+ */
+export interface SlideMaster {
+  /** Master relationship ID */
+  id: string;
+  /** Master name */
+  name?: string;
+  /** Master background */
+  background?: Background;
+  /** Master-level elements (logos, decorations visible on all slides) */
+  elements: SlideElement[];
+  /** Color mapping for this master */
+  colorMap: ColorMap;
+  /** Associated layout relationship IDs */
+  layoutIds: string[];
 }
 
 // ============================================================================
