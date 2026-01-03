@@ -68,6 +68,8 @@ export type {
   ImageFill,
   NoFill,
   Stroke,
+  ArrowHead,
+  Shadow,
   Color,
   GradientStop,
   Background,
@@ -75,6 +77,7 @@ export type {
 
   // Text
   TextBody,
+  TextAutofit,
   Paragraph,
   TextRun,
   BulletStyle,

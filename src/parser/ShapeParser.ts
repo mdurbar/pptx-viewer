@@ -24,6 +24,8 @@ import type {
   ShapeType,
   Fill,
   Stroke,
+  ArrowHead,
+  Shadow,
   Color,
   GradientStop,
   ThemeColors,
@@ -137,6 +139,9 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
   // Parse stroke
   const stroke = parseStroke(spPr, context.themeColors);
 
+  // Parse shadow
+  const shadow = parseShadow(spPr, context.themeColors);
+
   // Parse text content
   const txBody = findChildByName(sp, 'txBody');
   const text = txBody ? parseTextBody(txBody, context.themeColors, context.relationships) : undefined;
@@ -155,6 +160,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
       rotation,
       text: text!,
       placeholder,
+      shadow,
     };
   }
 
@@ -166,6 +172,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
     shapeType,
     fill,
     stroke,
+    shadow,
     text,
     placeholder,
   };
@@ -191,6 +198,9 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
 
   // Parse rotation
   const rotation = parseRotation(spPr);
+
+  // Parse shadow
+  const shadow = parseShadow(spPr, context.themeColors);
 
   // Get the image reference
   const blipFill = findChildByName(pic, 'blipFill');
@@ -219,6 +229,7 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
     src,
     mimeType,
     altText,
+    shadow,
   };
 }
 
@@ -794,10 +805,125 @@ function parseStroke(spPr: Element, themeColors: ThemeColors): Stroke | undefine
     }
   }
 
+  // Parse arrow heads
+  const headEnd = parseArrowHead(findChildByName(ln, 'headEnd'));
+  const tailEnd = parseArrowHead(findChildByName(ln, 'tailEnd'));
+
   return {
     color,
     width,
     dashStyle,
+    headEnd,
+    tailEnd,
+  };
+}
+
+/**
+ * Parses an arrow head element.
+ */
+function parseArrowHead(element: Element | null): ArrowHead | undefined {
+  if (!element) return undefined;
+
+  const typeAttr = getAttribute(element, 'type');
+  if (!typeAttr || typeAttr === 'none') return undefined;
+
+  // Map OOXML arrow types to our types
+  let type: ArrowHead['type'];
+  switch (typeAttr) {
+    case 'triangle':
+      type = 'triangle';
+      break;
+    case 'stealth':
+      type = 'stealth';
+      break;
+    case 'diamond':
+      type = 'diamond';
+      break;
+    case 'oval':
+      type = 'oval';
+      break;
+    case 'arrow':
+      type = 'arrow';
+      break;
+    default:
+      type = 'triangle'; // Default to triangle for unknown types
+  }
+
+  const widthAttr = getAttribute(element, 'w');
+  const width = (widthAttr === 'sm' || widthAttr === 'med' || widthAttr === 'lg')
+    ? widthAttr as ArrowHead['width']
+    : 'med';
+
+  const lengthAttr = getAttribute(element, 'len');
+  const length = (lengthAttr === 'sm' || lengthAttr === 'med' || lengthAttr === 'lg')
+    ? lengthAttr as ArrowHead['length']
+    : 'med';
+
+  return { type, width, length };
+}
+
+/**
+ * Parses shadow effects from shape properties.
+ * Shadows are defined in effectLst with outerShdw or innerShdw elements.
+ */
+function parseShadow(spPr: Element, themeColors: ThemeColors): Shadow | undefined {
+  const effectLst = findChildByName(spPr, 'effectLst');
+  if (!effectLst) return undefined;
+
+  // Check for outer shadow (most common)
+  const outerShdw = findChildByName(effectLst, 'outerShdw');
+  if (outerShdw) {
+    return parseShadowElement(outerShdw, 'outer', themeColors);
+  }
+
+  // Check for inner shadow
+  const innerShdw = findChildByName(effectLst, 'innerShdw');
+  if (innerShdw) {
+    return parseShadowElement(innerShdw, 'inner', themeColors);
+  }
+
+  return undefined;
+}
+
+/**
+ * Parses a shadow element (outerShdw or innerShdw).
+ */
+function parseShadowElement(
+  shdw: Element,
+  type: 'outer' | 'inner',
+  themeColors: ThemeColors
+): Shadow | undefined {
+  // Parse blur radius (in EMUs)
+  const blurRad = getNumberAttribute(shdw, 'blurRad', 0);
+  const blurRadius = emuToPixels(blurRad);
+
+  // Parse distance (in EMUs)
+  const dist = getNumberAttribute(shdw, 'dist', 0);
+  const distance = emuToPixels(dist);
+
+  // Parse direction (in 1/60000 of a degree)
+  const dir = getNumberAttribute(shdw, 'dir', 0);
+  const angle = dir / 60000; // Convert to degrees
+
+  // Parse color
+  const color = parseColorElement(shdw, themeColors);
+  if (!color) {
+    // Default shadow color if not specified
+    return {
+      type,
+      color: { hex: '#000000', alpha: 0.4 },
+      blurRadius: blurRadius || 4,
+      distance: distance || 3,
+      angle,
+    };
+  }
+
+  return {
+    type,
+    color,
+    blurRadius,
+    distance,
+    angle,
   };
 }
 

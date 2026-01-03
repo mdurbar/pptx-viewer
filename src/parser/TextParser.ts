@@ -13,6 +13,7 @@
 
 import type {
   TextBody,
+  TextAutofit,
   Paragraph,
   TextRun,
   BulletStyle,
@@ -50,6 +51,7 @@ export function parseTextBody(
   const bodyPr = findChildByName(txBody, 'bodyPr');
   const padding = parseBodyPadding(bodyPr);
   const verticalAlign = parseVerticalAlign(bodyPr);
+  const autofit = parseAutofit(bodyPr);
 
   // Parse paragraphs
   const pElements = findChildrenByName(txBody, 'p');
@@ -62,6 +64,7 @@ export function parseTextBody(
     paragraphs,
     verticalAlign,
     padding,
+    autofit,
   };
 }
 
@@ -98,6 +101,44 @@ function parseVerticalAlign(bodyPr: Element | null): TextBody['verticalAlign'] {
     default:
       return 'top';
   }
+}
+
+/**
+ * Parses text autofit settings.
+ */
+function parseAutofit(bodyPr: Element | null): TextAutofit | undefined {
+  if (!bodyPr) return undefined;
+
+  // Check for normal autofit (shrink text to fit)
+  const normAutofit = findChildByName(bodyPr, 'normAutofit');
+  if (normAutofit) {
+    const fontScale = getNumberAttribute(normAutofit, 'fontScale', 100000) / 100000;
+    const lnSpcReduction = getNumberAttribute(normAutofit, 'lnSpcReduction', 0) / 100000;
+
+    return {
+      type: 'normal',
+      fontScale,
+      lineSpacingReduction: lnSpcReduction,
+    };
+  }
+
+  // Check for shape autofit (resize shape to fit text)
+  const spAutoFit = findChildByName(bodyPr, 'spAutoFit');
+  if (spAutoFit) {
+    return {
+      type: 'shape',
+    };
+  }
+
+  // Check for no autofit
+  const noAutofit = findChildByName(bodyPr, 'noAutofit');
+  if (noAutofit) {
+    return {
+      type: 'none',
+    };
+  }
+
+  return undefined;
 }
 
 /**
@@ -380,6 +421,16 @@ function parseRunProperties(
   const strike = getAttribute(rPr, 'strike');
   if (strike && strike !== 'noStrike') {
     result.strikethrough = true;
+  }
+
+  // Baseline (subscript/superscript)
+  const baselineAttr = getAttribute(rPr, 'baseline');
+  if (baselineAttr) {
+    const baselineVal = parseInt(baselineAttr, 10);
+    if (!isNaN(baselineVal) && baselineVal !== 0) {
+      // Convert from 1000ths of percent to percent
+      result.baseline = baselineVal / 1000;
+    }
   }
 
   // Font family

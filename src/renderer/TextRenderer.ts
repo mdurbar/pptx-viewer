@@ -4,7 +4,7 @@
  * Converts parsed TextBody into HTML elements with proper styling.
  */
 
-import type { TextBody, Paragraph, TextRun, Color, BulletStyle } from '../core/types';
+import type { TextBody, Paragraph, TextRun, Color, BulletStyle, TextAutofit } from '../core/types';
 import { colorToCss } from '../utils/color';
 
 /**
@@ -15,6 +15,16 @@ interface NumberingState {
   numbers: Map<number, number>;
   /** Last bullet type seen at each level */
   lastBulletType: Map<number, string>;
+}
+
+/**
+ * Autofit context passed to paragraph and run renderers.
+ */
+interface AutofitContext {
+  /** Font scale multiplier (1 = 100%) */
+  fontScale: number;
+  /** Line spacing reduction multiplier (0 = no reduction) */
+  lineSpacingReduction: number;
 }
 
 /**
@@ -54,9 +64,15 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
     lastBulletType: new Map(),
   };
 
+  // Get autofit context
+  const autofitContext: AutofitContext = {
+    fontScale: text.autofit?.fontScale ?? 1,
+    lineSpacingReduction: text.autofit?.lineSpacingReduction ?? 0,
+  };
+
   // Render paragraphs
   for (const paragraph of text.paragraphs) {
-    const pElement = renderParagraph(paragraph, numberingState);
+    const pElement = renderParagraph(paragraph, numberingState, autofitContext);
     container.appendChild(pElement);
   }
 }
@@ -64,7 +80,11 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
 /**
  * Renders a paragraph to HTML.
  */
-function renderParagraph(paragraph: Paragraph, numberingState: NumberingState): HTMLElement {
+function renderParagraph(
+  paragraph: Paragraph,
+  numberingState: NumberingState,
+  autofitContext: AutofitContext
+): HTMLElement {
   const p = document.createElement('p');
   p.style.margin = '0';
   p.style.padding = '0';
@@ -83,9 +103,10 @@ function renderParagraph(paragraph: Paragraph, numberingState: NumberingState): 
       p.style.justifyContent = 'flex-start';
   }
 
-  // Apply line spacing
+  // Apply line spacing with autofit reduction
   if (paragraph.lineSpacing) {
-    p.style.lineHeight = String(paragraph.lineSpacing);
+    const reducedSpacing = paragraph.lineSpacing * (1 - autofitContext.lineSpacingReduction);
+    p.style.lineHeight = String(Math.max(reducedSpacing, 0.8)); // Don't go below 0.8
   }
 
   // Apply spacing
@@ -169,7 +190,7 @@ function renderParagraph(paragraph: Paragraph, numberingState: NumberingState): 
 
   // Render text runs
   for (const run of paragraph.runs) {
-    const runElement = renderTextRun(run);
+    const runElement = renderTextRun(run, autofitContext);
     textWrapper.appendChild(runElement);
   }
 
@@ -261,7 +282,7 @@ function toRoman(num: number, uppercase: boolean): string {
 /**
  * Renders a text run to HTML.
  */
-function renderTextRun(run: TextRun): HTMLElement {
+function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElement {
   const span = document.createElement('span');
 
   // Set text content
@@ -272,9 +293,10 @@ function renderTextRun(run: TextRun): HTMLElement {
     span.style.fontFamily = `"${run.fontFamily}", sans-serif`;
   }
 
-  // Apply font size
+  // Apply font size with autofit scaling
   if (run.fontSize) {
-    span.style.fontSize = `${run.fontSize}px`;
+    const scaledSize = run.fontSize * autofitContext.fontScale;
+    span.style.fontSize = `${scaledSize}px`;
   }
 
   // Apply color
@@ -302,6 +324,19 @@ function renderTextRun(run: TextRun): HTMLElement {
     span.style.textDecoration = span.style.textDecoration
       ? `${span.style.textDecoration} line-through`
       : 'line-through';
+  }
+
+  // Apply baseline (subscript/superscript)
+  if (run.baseline) {
+    if (run.baseline > 0) {
+      // Superscript: positive baseline
+      span.style.verticalAlign = 'super';
+      span.style.fontSize = '0.7em'; // Make it smaller
+    } else {
+      // Subscript: negative baseline
+      span.style.verticalAlign = 'sub';
+      span.style.fontSize = '0.7em'; // Make it smaller
+    }
   }
 
   // Apply hyperlink

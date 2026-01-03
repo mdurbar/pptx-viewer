@@ -92,6 +92,8 @@ export interface ShapeElement extends BaseElement {
   fill?: Fill;
   /** Stroke/outline style */
   stroke?: Stroke;
+  /** Shadow effect */
+  shadow?: Shadow;
   /** Text content inside the shape */
   text?: TextBody;
   /** Custom geometry path (for freeform shapes) */
@@ -109,6 +111,8 @@ export interface TextElement extends BaseElement {
   fill?: Fill;
   /** Stroke for text box border */
   stroke?: Stroke;
+  /** Shadow effect */
+  shadow?: Shadow;
 }
 
 /**
@@ -122,6 +126,8 @@ export interface ImageElement extends BaseElement {
   mimeType: string;
   /** Alt text for accessibility */
   altText?: string;
+  /** Shadow effect */
+  shadow?: Shadow;
 }
 
 /**
@@ -341,6 +347,38 @@ export interface Stroke {
   width: number;
   /** Dash pattern */
   dashStyle?: 'solid' | 'dash' | 'dot' | 'dashDot';
+  /** Arrow head at start of line */
+  headEnd?: ArrowHead;
+  /** Arrow head at end of line */
+  tailEnd?: ArrowHead;
+}
+
+/**
+ * Arrow head style for line endings.
+ */
+export interface ArrowHead {
+  /** Arrow type */
+  type: 'none' | 'triangle' | 'stealth' | 'diamond' | 'oval' | 'arrow';
+  /** Arrow width: small, medium, large */
+  width?: 'sm' | 'med' | 'lg';
+  /** Arrow length: small, medium, large */
+  length?: 'sm' | 'med' | 'lg';
+}
+
+/**
+ * Shadow effect.
+ */
+export interface Shadow {
+  /** Shadow type */
+  type: 'outer' | 'inner';
+  /** Shadow color */
+  color: Color;
+  /** Blur radius in pixels */
+  blurRadius: number;
+  /** Distance from shape in pixels */
+  distance: number;
+  /** Angle in degrees (0 = right, 90 = down) */
+  angle: number;
 }
 
 /**
@@ -378,6 +416,20 @@ export interface TextBody {
     bottom: number;
     left: number;
   };
+  /** Text autofit settings */
+  autofit?: TextAutofit;
+}
+
+/**
+ * Text autofit settings for shrinking text to fit container.
+ */
+export interface TextAutofit {
+  /** Type of autofit */
+  type: 'normal' | 'shape' | 'none';
+  /** Font scale as decimal (e.g., 0.925 = 92.5%) */
+  fontScale?: number;
+  /** Line spacing reduction as decimal (e.g., 0.1 = 10% reduction) */
+  lineSpacingReduction?: number;
 }
 
 /**
@@ -424,6 +476,8 @@ export interface TextRun {
   underline?: boolean;
   /** Strikethrough */
   strikethrough?: boolean;
+  /** Baseline offset as percentage (positive = superscript, negative = subscript) */
+  baseline?: number;
   /** Hyperlink URL */
   link?: string;
 }

@@ -13,6 +13,8 @@ import type {
   TableElement,
   Fill,
   Stroke,
+  ArrowHead,
+  Shadow,
   ShapeType,
   Bounds,
 } from '../core/types';
@@ -49,7 +51,7 @@ export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGG
       renderTextBox(element, group, defs);
       break;
     case 'image':
-      renderImage(element, group);
+      renderImage(element, group, defs);
       break;
     case 'group':
       renderGroup(element, group, defs);
@@ -85,7 +87,7 @@ function buildTransform(bounds: Bounds, rotation?: number): string {
  * Renders a shape element.
  */
 function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsElement): void {
-  const { bounds, shapeType, fill, stroke, text } = shape;
+  const { bounds, shapeType, fill, stroke, shadow, text } = shape;
 
   // Check if shape has any visible fill or stroke
   const hasVisibleFill = fill && fill.type !== 'none';
@@ -104,9 +106,15 @@ function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsEleme
 
     // Apply stroke
     if (hasVisibleStroke) {
-      applyStroke(shapeEl, stroke);
+      applyStroke(shapeEl, stroke, defs);
     } else {
       shapeEl.setAttribute('stroke', 'none');
+    }
+
+    // Apply shadow filter
+    if (shadow) {
+      const filterId = applyShadowFilter(shadow, defs);
+      shapeEl.setAttribute('filter', `url(#${filterId})`);
     }
 
     group.appendChild(shapeEl);
@@ -616,7 +624,7 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
 /**
  * Applies stroke to an SVG element.
  */
-function applyStroke(element: SVGElement, stroke: Stroke): void {
+function applyStroke(element: SVGElement, stroke: Stroke, defs: SVGDefsElement): void {
   element.setAttribute('stroke', colorToCss(stroke.color));
   element.setAttribute('stroke-width', String(stroke.width));
 
@@ -644,13 +652,237 @@ function applyStroke(element: SVGElement, stroke: Stroke): void {
       element.setAttribute('stroke-dasharray', dashArray);
     }
   }
+
+  // Apply arrow markers
+  if (stroke.headEnd) {
+    const markerId = createArrowMarker(stroke.headEnd, stroke, defs, 'start');
+    element.setAttribute('marker-start', `url(#${markerId})`);
+  }
+  if (stroke.tailEnd) {
+    const markerId = createArrowMarker(stroke.tailEnd, stroke, defs, 'end');
+    element.setAttribute('marker-end', `url(#${markerId})`);
+  }
+}
+
+/**
+ * Creates an SVG marker for an arrow head.
+ */
+function createArrowMarker(
+  arrow: ArrowHead,
+  stroke: Stroke,
+  defs: SVGDefsElement,
+  position: 'start' | 'end'
+): string {
+  const markerId = `arrow_${++defIdCounter}`;
+  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', markerId);
+  marker.setAttribute('markerUnits', 'strokeWidth');
+  marker.setAttribute('orient', 'auto');
+
+  // Size multipliers based on width and length
+  const widthMult = arrow.width === 'sm' ? 0.6 : arrow.width === 'lg' ? 1.5 : 1;
+  const lengthMult = arrow.length === 'sm' ? 0.6 : arrow.length === 'lg' ? 1.5 : 1;
+
+  const baseSize = 4;
+  const w = baseSize * widthMult;
+  const h = baseSize * lengthMult;
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('fill', colorToCss(stroke.color));
+
+  let d: string;
+  switch (arrow.type) {
+    case 'triangle':
+      if (position === 'end') {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', String(h));
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M 0 0 L ${h} ${w} L 0 ${w * 2} Z`;
+      } else {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', '0');
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M ${h} 0 L 0 ${w} L ${h} ${w * 2} Z`;
+      }
+      break;
+
+    case 'stealth':
+      if (position === 'end') {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', String(h));
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M 0 0 L ${h} ${w} L 0 ${w * 2} L ${h * 0.3} ${w} Z`;
+      } else {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', '0');
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M ${h} 0 L 0 ${w} L ${h} ${w * 2} L ${h * 0.7} ${w} Z`;
+      }
+      break;
+
+    case 'diamond':
+      marker.setAttribute('viewBox', `0 0 ${h * 2} ${w * 2}`);
+      marker.setAttribute('refX', String(h));
+      marker.setAttribute('refY', String(w));
+      marker.setAttribute('markerWidth', String(h * 2));
+      marker.setAttribute('markerHeight', String(w * 2));
+      d = `M 0 ${w} L ${h} 0 L ${h * 2} ${w} L ${h} ${w * 2} Z`;
+      break;
+
+    case 'oval':
+      marker.setAttribute('viewBox', `0 0 ${w * 2} ${w * 2}`);
+      marker.setAttribute('refX', String(w));
+      marker.setAttribute('refY', String(w));
+      marker.setAttribute('markerWidth', String(w * 2));
+      marker.setAttribute('markerHeight', String(w * 2));
+      const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ellipse.setAttribute('cx', String(w));
+      ellipse.setAttribute('cy', String(w));
+      ellipse.setAttribute('rx', String(w));
+      ellipse.setAttribute('ry', String(w));
+      ellipse.setAttribute('fill', colorToCss(stroke.color));
+      marker.appendChild(ellipse);
+      defs.appendChild(marker);
+      return markerId;
+
+    case 'arrow':
+    default:
+      if (position === 'end') {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', String(h));
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M 0 0 L ${h} ${w} L 0 ${w * 2}`;
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', colorToCss(stroke.color));
+        path.setAttribute('stroke-width', '1');
+      } else {
+        marker.setAttribute('viewBox', `0 0 ${h} ${w * 2}`);
+        marker.setAttribute('refX', '0');
+        marker.setAttribute('refY', String(w));
+        marker.setAttribute('markerWidth', String(h));
+        marker.setAttribute('markerHeight', String(w * 2));
+        d = `M ${h} 0 L 0 ${w} L ${h} ${w * 2}`;
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', colorToCss(stroke.color));
+        path.setAttribute('stroke-width', '1');
+      }
+      break;
+  }
+
+  path.setAttribute('d', d);
+  marker.appendChild(path);
+  defs.appendChild(marker);
+  return markerId;
+}
+
+/**
+ * Creates an SVG filter for shadow effects and returns the filter ID.
+ */
+function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
+  const filterId = `shadow_${++defIdCounter}`;
+  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  filter.setAttribute('id', filterId);
+
+  // Extend filter region to accommodate shadow offset and blur
+  filter.setAttribute('x', '-50%');
+  filter.setAttribute('y', '-50%');
+  filter.setAttribute('width', '200%');
+  filter.setAttribute('height', '200%');
+
+  // Calculate offset from angle and distance
+  const angleRad = (shadow.angle * Math.PI) / 180;
+  const dx = Math.cos(angleRad) * shadow.distance;
+  const dy = Math.sin(angleRad) * shadow.distance;
+
+  if (shadow.type === 'outer') {
+    // Use feDropShadow for outer shadows (simpler and more performant)
+    const dropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+    dropShadow.setAttribute('dx', String(dx));
+    dropShadow.setAttribute('dy', String(dy));
+    dropShadow.setAttribute('stdDeviation', String(shadow.blurRadius / 2));
+    dropShadow.setAttribute('flood-color', shadow.color.hex);
+    dropShadow.setAttribute('flood-opacity', String(shadow.color.alpha));
+    filter.appendChild(dropShadow);
+  } else {
+    // Inner shadow: more complex filter
+    // 1. Create inverted shape
+    const feComponentTransfer = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer');
+    feComponentTransfer.setAttribute('in', 'SourceAlpha');
+    feComponentTransfer.setAttribute('result', 'invert');
+    const feFuncA = document.createElementNS('http://www.w3.org/2000/svg', 'feFuncA');
+    feFuncA.setAttribute('type', 'table');
+    feFuncA.setAttribute('tableValues', '1 0');
+    feComponentTransfer.appendChild(feFuncA);
+    filter.appendChild(feComponentTransfer);
+
+    // 2. Offset the inverted shape
+    const feOffset = document.createElementNS('http://www.w3.org/2000/svg', 'feOffset');
+    feOffset.setAttribute('dx', String(dx));
+    feOffset.setAttribute('dy', String(dy));
+    feOffset.setAttribute('in', 'invert');
+    feOffset.setAttribute('result', 'offsetInvert');
+    filter.appendChild(feOffset);
+
+    // 3. Blur the offset shape
+    const feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+    feGaussianBlur.setAttribute('stdDeviation', String(shadow.blurRadius / 2));
+    feGaussianBlur.setAttribute('in', 'offsetInvert');
+    feGaussianBlur.setAttribute('result', 'blur');
+    filter.appendChild(feGaussianBlur);
+
+    // 4. Clip to original shape
+    const feComposite = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+    feComposite.setAttribute('operator', 'in');
+    feComposite.setAttribute('in', 'blur');
+    feComposite.setAttribute('in2', 'SourceAlpha');
+    feComposite.setAttribute('result', 'innerShadow');
+    filter.appendChild(feComposite);
+
+    // 5. Color the shadow
+    const feFlood = document.createElementNS('http://www.w3.org/2000/svg', 'feFlood');
+    feFlood.setAttribute('flood-color', shadow.color.hex);
+    feFlood.setAttribute('flood-opacity', String(shadow.color.alpha));
+    feFlood.setAttribute('result', 'color');
+    filter.appendChild(feFlood);
+
+    // 6. Apply color to shadow
+    const feComposite2 = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+    feComposite2.setAttribute('operator', 'in');
+    feComposite2.setAttribute('in', 'color');
+    feComposite2.setAttribute('in2', 'innerShadow');
+    feComposite2.setAttribute('result', 'coloredShadow');
+    filter.appendChild(feComposite2);
+
+    // 7. Merge with original
+    const feMerge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+    const feMergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    feMergeNode1.setAttribute('in', 'SourceGraphic');
+    const feMergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    feMergeNode2.setAttribute('in', 'coloredShadow');
+    feMerge.appendChild(feMergeNode1);
+    feMerge.appendChild(feMergeNode2);
+    filter.appendChild(feMerge);
+  }
+
+  defs.appendChild(filter);
+  return filterId;
 }
 
 /**
  * Renders a text box element.
  */
 function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsElement): void {
-  const { bounds, fill, stroke, text } = textEl;
+  const { bounds, fill, stroke, shadow, text } = textEl;
 
   // If there's a fill or stroke, add a background rect
   if (fill || stroke) {
@@ -665,7 +897,13 @@ function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsEle
     }
 
     if (stroke) {
-      applyStroke(rect, stroke);
+      applyStroke(rect, stroke, defs);
+    }
+
+    // Apply shadow filter
+    if (shadow) {
+      const filterId = applyShadowFilter(shadow, defs);
+      rect.setAttribute('filter', `url(#${filterId})`);
     }
 
     group.appendChild(rect);
@@ -681,8 +919,8 @@ function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsEle
 /**
  * Renders an image element.
  */
-function renderImage(imageEl: ImageElement, group: SVGGElement): void {
-  const { bounds, src, altText } = imageEl;
+function renderImage(imageEl: ImageElement, group: SVGGElement, defs: SVGDefsElement): void {
+  const { bounds, src, altText, shadow } = imageEl;
 
   const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
   image.setAttribute('href', src);
@@ -694,6 +932,12 @@ function renderImage(imageEl: ImageElement, group: SVGGElement): void {
     const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
     title.textContent = altText;
     image.appendChild(title);
+  }
+
+  // Apply shadow filter
+  if (shadow) {
+    const filterId = applyShadowFilter(shadow, defs);
+    image.setAttribute('filter', `url(#${filterId})`);
   }
 
   group.appendChild(image);
