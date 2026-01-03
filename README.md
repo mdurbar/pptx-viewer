@@ -243,7 +243,11 @@ presentation.slides.forEach((slide, index) => {
 - **Slide masters & layouts** - Background and element inheritance from masters and layouts
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
-- **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough
+- **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript
+- **Text autofit** - Automatic font scaling to fit text in containers
+- **Bullet and numbered lists** - Multiple formats (arabic, alpha, roman) with proper indentation
+- **Shadow effects** - Outer and inner shadows on shapes, images, and text boxes
+- **Line arrow heads** - Triangle, stealth, diamond, oval, and arrow markers
 - **Hyperlinks** - Clickable links in text
 - **Images** - PNG, JPEG, GIF, etc.
 - **Solid and gradient fills** - Including theme colors and preset colors
@@ -314,10 +318,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Areas for Contribution
 
-- Better text rendering fidelity (bullet/list rendering)
+- Integration tests with real PPTX files
 - Performance optimizations
-- Additional shape types and effects
-- Shadow effects
+- Native chart rendering (currently uses fallback images)
+- Pattern fills
+- Text effects (glow, reflection)
 
 ## License
 
