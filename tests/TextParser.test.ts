@@ -259,6 +259,26 @@ describe('TextParser', () => {
       expect(result.paragraphs[0].runs).toHaveLength(1);
       expect(result.paragraphs[0].runs[0].text).toBe('1');
     });
+
+    it('parses text highlight color', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r>
+              <rPr>
+                <highlight><srgbClr val="FFFF00"/></highlight>
+              </rPr>
+              <t>Highlighted text</t>
+            </r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].runs[0].highlight).toBeDefined();
+      expect(result.paragraphs[0].runs[0].highlight?.hex).toBe('#FFFF00');
+    });
   });
 
   describe('parseColorElement', () => {

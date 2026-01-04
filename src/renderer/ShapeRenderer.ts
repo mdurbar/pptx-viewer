@@ -17,6 +17,8 @@ import type {
   Shadow,
   ShapeType,
   Bounds,
+  PatternType,
+  Color,
 } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { renderTextBodyToSvg } from './TextRenderer';
@@ -642,6 +644,26 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
       break;
     }
 
+    case 'pattern': {
+      const patternId = `pattern_${++defIdCounter}`;
+      const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      pattern.setAttribute('id', patternId);
+      pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+
+      // Get pattern size based on pattern type
+      const patternSize = getPatternSize(fill.pattern);
+      pattern.setAttribute('width', String(patternSize));
+      pattern.setAttribute('height', String(patternSize));
+
+      // Create pattern content
+      const patternContent = createPatternContent(fill.pattern, fill.foreground, fill.background, patternSize);
+      pattern.appendChild(patternContent);
+
+      defs.appendChild(pattern);
+      element.setAttribute('fill', `url(#${patternId})`);
+      break;
+    }
+
     case 'image': {
       const patternId = `pattern_${++defIdCounter}`;
       const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
@@ -1006,4 +1028,253 @@ function renderGroup(groupEl: GroupElement, group: SVGGElement, defs: SVGDefsEle
 function renderTableElement(tableEl: TableElement, group: SVGGElement): void {
   const tableFo = renderTable(tableEl);
   group.appendChild(tableFo);
+}
+
+/**
+ * Gets the pattern tile size based on pattern type.
+ */
+function getPatternSize(pattern: PatternType): number {
+  // Most patterns use an 8x8 tile
+  const smallPatterns = ['pct5', 'pct10', 'smCheck', 'smGrid', 'smConfetti', 'dotGrid'];
+  const largePatterns = ['lgCheck', 'lgGrid', 'lgConfetti', 'horzBrick', 'diagBrick', 'plaid'];
+
+  if (smallPatterns.includes(pattern)) return 4;
+  if (largePatterns.includes(pattern)) return 16;
+  return 8;
+}
+
+/**
+ * Creates SVG content for a pattern.
+ */
+function createPatternContent(
+  pattern: PatternType,
+  foreground: Color,
+  background: Color,
+  size: number
+): SVGGElement {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+  // Background rectangle
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('width', String(size));
+  bg.setAttribute('height', String(size));
+  bg.setAttribute('fill', background.hex);
+  if (background.alpha < 1) {
+    bg.setAttribute('fill-opacity', String(background.alpha));
+  }
+  g.appendChild(bg);
+
+  const fgColor = foreground.hex;
+  const fgOpacity = foreground.alpha < 1 ? foreground.alpha : undefined;
+
+  // Create pattern-specific shapes
+  switch (pattern) {
+    // Percentage patterns (dots)
+    case 'pct5':
+    case 'pct10':
+    case 'pct20':
+    case 'pct25':
+    case 'pct30':
+    case 'pct40':
+    case 'pct50':
+    case 'pct60':
+    case 'pct70':
+    case 'pct75':
+    case 'pct80':
+    case 'pct90': {
+      const pct = parseInt(pattern.replace('pct', ''), 10);
+      const dotCount = Math.ceil((pct / 100) * (size * size / 4));
+      for (let i = 0; i < dotCount; i++) {
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const x = (i * 3) % size;
+        const y = Math.floor((i * 3) / size) * 2 % size;
+        dot.setAttribute('x', String(x));
+        dot.setAttribute('y', String(y));
+        dot.setAttribute('width', '1');
+        dot.setAttribute('height', '1');
+        dot.setAttribute('fill', fgColor);
+        if (fgOpacity) dot.setAttribute('fill-opacity', String(fgOpacity));
+        g.appendChild(dot);
+      }
+      break;
+    }
+
+    // Horizontal lines
+    case 'horz':
+    case 'ltHorz':
+    case 'dkHorz':
+    case 'narHorz':
+    case 'wdHorz':
+    case 'dashHorz': {
+      const lineWidth = pattern.includes('lt') ? 1 : pattern.includes('dk') ? 3 : 2;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      line.setAttribute('x', '0');
+      line.setAttribute('y', String((size - lineWidth) / 2));
+      line.setAttribute('width', String(size));
+      line.setAttribute('height', String(lineWidth));
+      line.setAttribute('fill', fgColor);
+      if (fgOpacity) line.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(line);
+      break;
+    }
+
+    // Vertical lines
+    case 'vert':
+    case 'ltVert':
+    case 'dkVert':
+    case 'narVert':
+    case 'wdVert':
+    case 'dashVert': {
+      const lineWidth = pattern.includes('lt') ? 1 : pattern.includes('dk') ? 3 : 2;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      line.setAttribute('x', String((size - lineWidth) / 2));
+      line.setAttribute('y', '0');
+      line.setAttribute('width', String(lineWidth));
+      line.setAttribute('height', String(size));
+      line.setAttribute('fill', fgColor);
+      if (fgOpacity) line.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(line);
+      break;
+    }
+
+    // Cross/grid patterns
+    case 'cross':
+    case 'smGrid':
+    case 'lgGrid': {
+      // Horizontal line
+      const hLine = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      hLine.setAttribute('x', '0');
+      hLine.setAttribute('y', String(size / 2 - 0.5));
+      hLine.setAttribute('width', String(size));
+      hLine.setAttribute('height', '1');
+      hLine.setAttribute('fill', fgColor);
+      if (fgOpacity) hLine.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(hLine);
+      // Vertical line
+      const vLine = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      vLine.setAttribute('x', String(size / 2 - 0.5));
+      vLine.setAttribute('y', '0');
+      vLine.setAttribute('width', '1');
+      vLine.setAttribute('height', String(size));
+      vLine.setAttribute('fill', fgColor);
+      if (fgOpacity) vLine.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(vLine);
+      break;
+    }
+
+    // Diagonal patterns
+    case 'dnDiag':
+    case 'ltDnDiag':
+    case 'dkDnDiag':
+    case 'wdDnDiag': {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', '0');
+      line.setAttribute('x2', String(size));
+      line.setAttribute('y2', String(size));
+      line.setAttribute('stroke', fgColor);
+      line.setAttribute('stroke-width', pattern.includes('dk') ? '2' : '1');
+      if (fgOpacity) line.setAttribute('stroke-opacity', String(fgOpacity));
+      g.appendChild(line);
+      break;
+    }
+
+    case 'upDiag':
+    case 'ltUpDiag':
+    case 'dkUpDiag':
+    case 'wdUpDiag': {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', String(size));
+      line.setAttribute('x2', String(size));
+      line.setAttribute('y2', '0');
+      line.setAttribute('stroke', fgColor);
+      line.setAttribute('stroke-width', pattern.includes('dk') ? '2' : '1');
+      if (fgOpacity) line.setAttribute('stroke-opacity', String(fgOpacity));
+      g.appendChild(line);
+      break;
+    }
+
+    // Diagonal cross
+    case 'diagCross': {
+      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line1.setAttribute('x1', '0');
+      line1.setAttribute('y1', '0');
+      line1.setAttribute('x2', String(size));
+      line1.setAttribute('y2', String(size));
+      line1.setAttribute('stroke', fgColor);
+      line1.setAttribute('stroke-width', '1');
+      if (fgOpacity) line1.setAttribute('stroke-opacity', String(fgOpacity));
+      g.appendChild(line1);
+
+      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line2.setAttribute('x1', '0');
+      line2.setAttribute('y1', String(size));
+      line2.setAttribute('x2', String(size));
+      line2.setAttribute('y2', '0');
+      line2.setAttribute('stroke', fgColor);
+      line2.setAttribute('stroke-width', '1');
+      if (fgOpacity) line2.setAttribute('stroke-opacity', String(fgOpacity));
+      g.appendChild(line2);
+      break;
+    }
+
+    // Checkerboard patterns
+    case 'smCheck':
+    case 'lgCheck': {
+      const halfSize = size / 2;
+      const rect1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect1.setAttribute('x', '0');
+      rect1.setAttribute('y', '0');
+      rect1.setAttribute('width', String(halfSize));
+      rect1.setAttribute('height', String(halfSize));
+      rect1.setAttribute('fill', fgColor);
+      if (fgOpacity) rect1.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(rect1);
+
+      const rect2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect2.setAttribute('x', String(halfSize));
+      rect2.setAttribute('y', String(halfSize));
+      rect2.setAttribute('width', String(halfSize));
+      rect2.setAttribute('height', String(halfSize));
+      rect2.setAttribute('fill', fgColor);
+      if (fgOpacity) rect2.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(rect2);
+      break;
+    }
+
+    // Diamond patterns
+    case 'solidDmnd':
+    case 'openDmnd':
+    case 'dotDmnd': {
+      const half = size / 2;
+      const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      diamond.setAttribute('points', `${half},0 ${size},${half} ${half},${size} 0,${half}`);
+      if (pattern === 'openDmnd') {
+        diamond.setAttribute('fill', 'none');
+        diamond.setAttribute('stroke', fgColor);
+        diamond.setAttribute('stroke-width', '1');
+      } else {
+        diamond.setAttribute('fill', fgColor);
+      }
+      if (fgOpacity) {
+        diamond.setAttribute(pattern === 'openDmnd' ? 'stroke-opacity' : 'fill-opacity', String(fgOpacity));
+      }
+      g.appendChild(diamond);
+      break;
+    }
+
+    // Default: simple dot pattern
+    default: {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', String(size / 2));
+      dot.setAttribute('cy', String(size / 2));
+      dot.setAttribute('r', String(size / 4));
+      dot.setAttribute('fill', fgColor);
+      if (fgOpacity) dot.setAttribute('fill-opacity', String(fgOpacity));
+      g.appendChild(dot);
+    }
+  }
+
+  return g;
 }

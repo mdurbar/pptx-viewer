@@ -23,6 +23,7 @@ import type {
   Bounds,
   ShapeType,
   Fill,
+  PatternType,
   Stroke,
   ArrowHead,
   Shadow,
@@ -746,15 +747,26 @@ function parseFill(spPr: Element, themeColors: ThemeColors): Fill | undefined {
     return parseGradientFill(gradFill, themeColors);
   }
 
-  // Check for pattern fill (treat as solid with foreground color)
+  // Check for pattern fill
   const pattFill = findChildByName(spPr, 'pattFill');
   if (pattFill) {
+    const patternType = getAttribute(pattFill, 'prst') as PatternType | null;
     const fgClr = findChildByName(pattFill, 'fgClr');
-    if (fgClr) {
-      const color = parseColorElement(fgClr, themeColors);
-      if (color) {
-        return { type: 'solid', color };
-      }
+    const bgClr = findChildByName(pattFill, 'bgClr');
+
+    const foreground = fgClr ? parseColorElement(fgClr, themeColors) : null;
+    const background = bgClr ? parseColorElement(bgClr, themeColors) : null;
+
+    if (patternType && foreground) {
+      return {
+        type: 'pattern',
+        pattern: patternType,
+        foreground,
+        background: background || { hex: '#FFFFFF', alpha: 1 },
+      };
+    } else if (foreground) {
+      // Fallback to solid if pattern type is missing
+      return { type: 'solid', color: foreground };
     }
   }
 

@@ -351,6 +351,11 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     span.style.fontVariant = 'small-caps';
   }
 
+  // Apply highlight/background color
+  if (run.highlight) {
+    span.style.backgroundColor = colorToCss(run.highlight);
+  }
+
   // Apply hyperlink
   if (run.link) {
     const link = document.createElement('a');

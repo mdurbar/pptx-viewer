@@ -478,6 +478,15 @@ function parseRunProperties(
     }
   }
 
+  // Highlight/background color
+  const highlight = findChildByName(rPr, 'highlight');
+  if (highlight) {
+    const highlightColor = parseColorElement(highlight, themeColors);
+    if (highlightColor) {
+      result.highlight = highlightColor;
+    }
+  }
+
   return result;
 }
 

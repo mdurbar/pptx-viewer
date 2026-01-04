@@ -308,12 +308,39 @@ export type ShapeType =
 /**
  * Fill style for shapes and backgrounds.
  */
-export type Fill = SolidFill | GradientFill | ImageFill | NoFill;
+export type Fill = SolidFill | GradientFill | PatternFill | ImageFill | NoFill;
 
 export interface SolidFill {
   type: 'solid';
   color: Color;
 }
+
+export interface PatternFill {
+  type: 'pattern';
+  /** Pattern preset name */
+  pattern: PatternType;
+  /** Foreground color */
+  foreground: Color;
+  /** Background color */
+  background: Color;
+}
+
+/**
+ * Pattern fill types from OOXML.
+ */
+export type PatternType =
+  | 'pct5' | 'pct10' | 'pct20' | 'pct25' | 'pct30' | 'pct40'
+  | 'pct50' | 'pct60' | 'pct70' | 'pct75' | 'pct80' | 'pct90'
+  | 'horz' | 'vert' | 'ltHorz' | 'ltVert' | 'dkHorz' | 'dkVert'
+  | 'narHorz' | 'narVert' | 'wdHorz' | 'wdVert'
+  | 'dashHorz' | 'dashVert' | 'cross' | 'dnDiag' | 'upDiag'
+  | 'ltDnDiag' | 'ltUpDiag' | 'dkDnDiag' | 'dkUpDiag'
+  | 'wdDnDiag' | 'wdUpDiag' | 'diagCross'
+  | 'smCheck' | 'lgCheck' | 'smGrid' | 'lgGrid'
+  | 'dotGrid' | 'smConfetti' | 'lgConfetti'
+  | 'horzBrick' | 'diagBrick' | 'solidDmnd' | 'openDmnd'
+  | 'dotDmnd' | 'plaid' | 'sphere' | 'weave' | 'divot'
+  | 'shingle' | 'wave' | 'trellis' | 'zigZag';
 
 export interface GradientFill {
   type: 'gradient';
@@ -497,6 +524,8 @@ export interface TextRun {
   characterSpacing?: number;
   /** Text capitalization */
   capitalization?: 'none' | 'allCaps' | 'smallCaps';
+  /** Text highlight/background color */
+  highlight?: Color;
 }
 
 /**

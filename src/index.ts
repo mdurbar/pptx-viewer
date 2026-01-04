@@ -65,6 +65,8 @@ export type {
   Fill,
   SolidFill,
   GradientFill,
+  PatternFill,
+  PatternType,
   ImageFill,
   NoFill,
   Stroke,
