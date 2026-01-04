@@ -244,13 +244,15 @@ presentation.slides.forEach((slide, index) => {
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript
+- **Character spacing & capitalization** - Letter-spacing, all caps, and small caps
 - **Text autofit** - Automatic font scaling to fit text in containers
 - **Bullet and numbered lists** - Multiple formats (arabic, alpha, roman) with proper indentation
 - **Shadow effects** - Outer and inner shadows on shapes, images, and text boxes
 - **Line arrow heads** - Triangle, stealth, diamond, oval, and arrow markers
+- **Shape adjustments** - Custom corner radius, snip sizes, star point depths, and more
 - **Hyperlinks** - Clickable links in text
 - **Images** - PNG, JPEG, GIF, etc.
-- **Solid and gradient fills** - Including theme colors and preset colors
+- **Solid and gradient fills** - Linear and radial gradients, including theme colors and preset colors
 - **Stroke/outline styles** - Color, width, dash patterns
 - **Grouped shapes** - Nested groups supported
 - **Theme colors and fonts** - Full theme support

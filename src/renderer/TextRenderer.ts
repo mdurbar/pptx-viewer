@@ -339,6 +339,18 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     }
   }
 
+  // Apply character spacing
+  if (run.characterSpacing) {
+    span.style.letterSpacing = `${run.characterSpacing}px`;
+  }
+
+  // Apply text capitalization
+  if (run.capitalization === 'allCaps') {
+    span.style.textTransform = 'uppercase';
+  } else if (run.capitalization === 'smallCaps') {
+    span.style.fontVariant = 'small-caps';
+  }
+
   // Apply hyperlink
   if (run.link) {
     const link = document.createElement('a');

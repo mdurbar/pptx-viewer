@@ -98,6 +98,8 @@ export interface ShapeElement extends BaseElement {
   text?: TextBody;
   /** Custom geometry path (for freeform shapes) */
   path?: string;
+  /** Shape adjustment values (e.g., corner radius for rounded rectangles) */
+  adjustments?: Map<string, number>;
 }
 
 /**
@@ -315,10 +317,21 @@ export interface SolidFill {
 
 export interface GradientFill {
   type: 'gradient';
-  /** Gradient angle in degrees */
+  /** Gradient type (linear or radial) */
+  gradientType: 'linear' | 'radial';
+  /** Gradient angle in degrees (for linear gradients) */
   angle: number;
   /** Gradient color stops */
   stops: GradientStop[];
+  /** Radial gradient path type (for radial gradients) */
+  path?: 'circle' | 'rect';
+  /** Fill to rect - defines the rectangle that bounds the gradient (for radial) */
+  fillToRect?: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  };
 }
 
 export interface GradientStop {
@@ -480,6 +493,10 @@ export interface TextRun {
   baseline?: number;
   /** Hyperlink URL */
   link?: string;
+  /** Character spacing in pixels (can be negative for tighter spacing) */
+  characterSpacing?: number;
+  /** Text capitalization */
+  capitalization?: 'none' | 'allCaps' | 'smallCaps';
 }
 
 /**

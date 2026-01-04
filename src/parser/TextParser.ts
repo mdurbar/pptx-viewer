@@ -433,6 +433,20 @@ function parseRunProperties(
     }
   }
 
+  // Character spacing (in hundredths of a point, like font size)
+  const spc = getNumberAttribute(rPr, 'spc', 0);
+  if (spc !== 0) {
+    result.characterSpacing = centipointsToPixels(spc);
+  }
+
+  // Text capitalization
+  const cap = getAttribute(rPr, 'cap');
+  if (cap === 'all') {
+    result.capitalization = 'allCaps';
+  } else if (cap === 'small') {
+    result.capitalization = 'smallCaps';
+  }
+
   // Font family
   const latin = findChildByName(rPr, 'latin');
   if (latin) {

@@ -133,6 +133,9 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
   // Parse shape type
   const shapeType = parseShapeType(spPr);
 
+  // Parse shape adjustments
+  const adjustments = parseShapeAdjustments(spPr);
+
   // Parse fill
   const fill = parseFill(spPr, context.themeColors);
 
@@ -175,6 +178,7 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
     shadow,
     text,
     placeholder,
+    adjustments,
   };
 }
 
@@ -689,6 +693,37 @@ function parseShapeType(spPr: Element): ShapeType {
 }
 
 /**
+ * Parses shape adjustment values from preset geometry.
+ * These values customize shape geometry (e.g., corner radius for rounded rectangles).
+ */
+function parseShapeAdjustments(spPr: Element): Map<string, number> | undefined {
+  const prstGeom = findChildByName(spPr, 'prstGeom');
+  if (!prstGeom) return undefined;
+
+  const avLst = findChildByName(prstGeom, 'avLst');
+  if (!avLst) return undefined;
+
+  const adjustments = new Map<string, number>();
+  const gdElements = findChildrenByName(avLst, 'gd');
+
+  for (const gd of gdElements) {
+    const name = getAttribute(gd, 'name');
+    const fmla = getAttribute(gd, 'fmla');
+
+    if (name && fmla) {
+      // Formula is typically "val <number>" where number is in 1/100000ths (0-100000 = 0-100%)
+      const match = fmla.match(/val\s+(-?\d+)/);
+      if (match) {
+        const value = parseInt(match[1], 10) / 100000; // Convert to 0-1 scale
+        adjustments.set(name, value);
+      }
+    }
+  }
+
+  return adjustments.size > 0 ? adjustments : undefined;
+}
+
+/**
  * Parses fill style from shape properties.
  */
 function parseFill(spPr: Element, themeColors: ThemeColors): Fill | undefined {
@@ -745,18 +780,47 @@ function parseGradientFill(gradFill: Element, themeColors: ThemeColors): Fill {
     }
   }
 
-  // Parse gradient direction
+  // Sort stops by position
+  stops.sort((a, b) => a.position - b.position);
+
+  // Check for radial gradient (path element)
+  const pathEl = findChildByName(gradFill, 'path');
+  if (pathEl) {
+    const pathType = getAttribute(pathEl, 'path') as 'circle' | 'rect' | null;
+
+    // Parse fillToRect for gradient center/bounds
+    const fillToRect = findChildByName(pathEl, 'fillToRect');
+    let fillToRectData: { left: number; top: number; right: number; bottom: number } | undefined;
+
+    if (fillToRect) {
+      fillToRectData = {
+        left: getNumberAttribute(fillToRect, 'l', 50000) / 100000,
+        top: getNumberAttribute(fillToRect, 't', 50000) / 100000,
+        right: getNumberAttribute(fillToRect, 'r', 50000) / 100000,
+        bottom: getNumberAttribute(fillToRect, 'b', 50000) / 100000,
+      };
+    }
+
+    return {
+      type: 'gradient',
+      gradientType: 'radial',
+      angle: 0,
+      stops,
+      path: pathType || 'circle',
+      fillToRect: fillToRectData,
+    };
+  }
+
+  // Linear gradient
   let angle = 0;
   const lin = findChildByName(gradFill, 'lin');
   if (lin) {
     angle = ooxmlAngleToDegrees(getNumberAttribute(lin, 'ang', 0));
   }
 
-  // Sort stops by position
-  stops.sort((a, b) => a.position - b.position);
-
   return {
     type: 'gradient',
+    gradientType: 'linear',
     angle,
     stops,
   };

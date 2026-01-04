@@ -87,7 +87,7 @@ function buildTransform(bounds: Bounds, rotation?: number): string {
  * Renders a shape element.
  */
 function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsElement): void {
-  const { bounds, shapeType, fill, stroke, shadow, text } = shape;
+  const { bounds, shapeType, fill, stroke, shadow, text, adjustments } = shape;
 
   // Check if shape has any visible fill or stroke
   const hasVisibleFill = fill && fill.type !== 'none';
@@ -95,7 +95,7 @@ function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsEleme
 
   // Only create shape element if it has visible fill or stroke
   if (hasVisibleFill || hasVisibleStroke) {
-    const shapeEl = createShapeElement(shapeType, bounds.width, bounds.height);
+    const shapeEl = createShapeElement(shapeType, bounds.width, bounds.height, adjustments);
 
     // Apply fill
     if (hasVisibleFill) {
@@ -130,7 +130,12 @@ function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsEleme
 /**
  * Creates an SVG element for a shape type.
  */
-function createShapeElement(shapeType: ShapeType, width: number, height: number): SVGElement {
+function createShapeElement(
+  shapeType: ShapeType,
+  width: number,
+  height: number,
+  adjustments?: Map<string, number>
+): SVGElement {
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   let d: string;
 
@@ -148,21 +153,28 @@ function createShapeElement(shapeType: ShapeType, width: number, height: number)
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('width', String(width));
       rect.setAttribute('height', String(height));
-      const radius = Math.min(width, height) / 8;
+      // Use adjustment value if available, otherwise default to 1/8
+      // The 'adj' value is typically 0-0.5 (0-50%) representing corner radius as fraction of min dimension
+      const adjValue = adjustments?.get('adj') ?? 0.125; // Default ~12.5%
+      const radius = Math.min(width, height) * adjValue;
       rect.setAttribute('rx', String(radius));
       rect.setAttribute('ry', String(radius));
       return rect;
     }
 
     case 'snip1Rect': {
-      const snip = Math.min(width, height) * 0.15;
+      // Use adjustment for snip size
+      const adjValue = adjustments?.get('adj') ?? 0.15;
+      const snip = Math.min(width, height) * adjValue;
       d = `M 0 0 L ${width - snip} 0 L ${width} ${snip} L ${width} ${height} L 0 ${height} Z`;
       path.setAttribute('d', d);
       return path;
     }
 
     case 'snip2Rect': {
-      const snip = Math.min(width, height) * 0.15;
+      // Use adjustment for snip size
+      const adjValue = adjustments?.get('adj1') ?? adjustments?.get('adj') ?? 0.15;
+      const snip = Math.min(width, height) * adjValue;
       d = `M ${snip} 0 L ${width - snip} 0 L ${width} ${snip} L ${width} ${height - snip} L ${width - snip} ${height} L ${snip} ${height} L 0 ${height - snip} L 0 ${snip} Z`;
       path.setAttribute('d', d);
       return path;
@@ -225,7 +237,9 @@ function createShapeElement(shapeType: ShapeType, width: number, height: number)
       const cx = width / 2;
       const cy = height / 2;
       const outerR = Math.min(width, height) / 2;
-      const innerR = outerR * 0.4;
+      // Use adjustment for inner radius ratio (adj typically 0.19-0.5)
+      const innerRatio = adjustments?.get('adj') ?? 0.4;
+      const innerR = outerR * innerRatio;
       const starPath = generateStarPoints(cx, cy, outerR, innerR, starPoints);
       path.setAttribute('d', starPath);
       return path;
@@ -568,29 +582,62 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
 
     case 'gradient': {
       const gradientId = `gradient_${++defIdCounter}`;
-      const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-      gradient.setAttribute('id', gradientId);
 
-      // Set gradient angle
-      const angle = fill.angle || 0;
-      const radians = (angle * Math.PI) / 180;
-      gradient.setAttribute('x1', String(50 - 50 * Math.cos(radians)) + '%');
-      gradient.setAttribute('y1', String(50 - 50 * Math.sin(radians)) + '%');
-      gradient.setAttribute('x2', String(50 + 50 * Math.cos(radians)) + '%');
-      gradient.setAttribute('y2', String(50 + 50 * Math.sin(radians)) + '%');
+      if (fill.gradientType === 'radial') {
+        // Radial gradient
+        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+        gradient.setAttribute('id', gradientId);
 
-      // Add stops
-      for (const stop of fill.stops) {
-        const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-        stopEl.setAttribute('offset', `${stop.position * 100}%`);
-        stopEl.setAttribute('stop-color', stop.color.hex);
-        if (stop.color.alpha < 1) {
-          stopEl.setAttribute('stop-opacity', String(stop.color.alpha));
+        // Calculate center from fillToRect (defaults to center)
+        const rect = fill.fillToRect || { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 };
+        const cx = (rect.left + (1 - rect.right)) / 2 * 100;
+        const cy = (rect.top + (1 - rect.bottom)) / 2 * 100;
+
+        gradient.setAttribute('cx', `${cx}%`);
+        gradient.setAttribute('cy', `${cy}%`);
+        gradient.setAttribute('r', '70.71%'); // sqrt(2)/2 * 100 to cover corners
+        gradient.setAttribute('fx', `${cx}%`);
+        gradient.setAttribute('fy', `${cy}%`);
+
+        // Add stops
+        for (const stop of fill.stops) {
+          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          stopEl.setAttribute('offset', `${stop.position * 100}%`);
+          stopEl.setAttribute('stop-color', stop.color.hex);
+          if (stop.color.alpha < 1) {
+            stopEl.setAttribute('stop-opacity', String(stop.color.alpha));
+          }
+          gradient.appendChild(stopEl);
         }
-        gradient.appendChild(stopEl);
+
+        defs.appendChild(gradient);
+      } else {
+        // Linear gradient
+        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        gradient.setAttribute('id', gradientId);
+
+        // Set gradient angle
+        const angle = fill.angle || 0;
+        const radians = (angle * Math.PI) / 180;
+        gradient.setAttribute('x1', String(50 - 50 * Math.cos(radians)) + '%');
+        gradient.setAttribute('y1', String(50 - 50 * Math.sin(radians)) + '%');
+        gradient.setAttribute('x2', String(50 + 50 * Math.cos(radians)) + '%');
+        gradient.setAttribute('y2', String(50 + 50 * Math.sin(radians)) + '%');
+
+        // Add stops
+        for (const stop of fill.stops) {
+          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          stopEl.setAttribute('offset', `${stop.position * 100}%`);
+          stopEl.setAttribute('stop-color', stop.color.hex);
+          if (stop.color.alpha < 1) {
+            stopEl.setAttribute('stop-opacity', String(stop.color.alpha));
+          }
+          gradient.appendChild(stopEl);
+        }
+
+        defs.appendChild(gradient);
       }
 
-      defs.appendChild(gradient);
       element.setAttribute('fill', `url(#${gradientId})`);
       break;
     }
