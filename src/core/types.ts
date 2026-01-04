@@ -69,6 +69,8 @@ export interface BaseElement {
   rotation?: number;
   /** Placeholder info (if this element is a placeholder) */
   placeholder?: PlaceholderInfo;
+  /** Overall opacity (0-1, where 1 is fully opaque) */
+  opacity?: number;
 }
 
 /**
@@ -551,6 +553,18 @@ export interface TextRun {
   glow?: TextGlow;
   /** Reflection effect */
   reflection?: TextReflection;
+  /** Text outline/stroke */
+  outline?: TextOutline;
+}
+
+/**
+ * Text outline/stroke style.
+ */
+export interface TextOutline {
+  /** Outline color */
+  color: Color;
+  /** Outline width in pixels */
+  width: number;
 }
 
 /**

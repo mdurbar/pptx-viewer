@@ -328,6 +328,29 @@ describe('TextParser', () => {
       expect(result.paragraphs[0].runs[0].reflection?.endOpacity).toBe(0);
       expect(result.paragraphs[0].runs[0].reflection?.direction).toBe(90); // 5400000 / 60000 = 90
     });
+
+    it('parses text outline', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r>
+              <rPr>
+                <ln w="12700">
+                  <solidFill><srgbClr val="0000FF"/></solidFill>
+                </ln>
+              </rPr>
+              <t>Outlined text</t>
+            </r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].runs[0].outline).toBeDefined();
+      expect(result.paragraphs[0].runs[0].outline?.color.hex).toBe('#0000FF');
+      expect(result.paragraphs[0].runs[0].outline?.width).toBeGreaterThan(0);
+    });
   });
 
   describe('parseColorElement', () => {

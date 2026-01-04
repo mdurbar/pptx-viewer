@@ -86,6 +86,7 @@ export type {
   BulletStyle,
   TextGlow,
   TextReflection,
+  TextOutline,
 
   // Theme
   Theme,

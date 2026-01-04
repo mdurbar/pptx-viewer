@@ -45,6 +45,11 @@ export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGG
     group.setAttribute('transform', transform);
   }
 
+  // Apply element-level opacity
+  if (element.opacity !== undefined && element.opacity < 1) {
+    group.setAttribute('opacity', String(element.opacity));
+  }
+
   switch (element.type) {
     case 'shape':
       renderShape(element, group, defs);

@@ -21,6 +21,7 @@ import type {
   ThemeColors,
   TextGlow,
   TextReflection,
+  TextOutline,
 } from '../core/types';
 import type { RelationshipMap } from './RelationshipParser';
 import {
@@ -505,6 +506,12 @@ function parseRunProperties(
     }
   }
 
+  // Text outline (ln element)
+  const outline = parseTextOutline(rPr, themeColors);
+  if (outline) {
+    result.outline = outline;
+  }
+
   return result;
 }
 
@@ -631,5 +638,36 @@ function parseTextReflection(effectLst: Element): TextReflection | null {
     scaleY: sy / 1000,
     skewX: kx / 60000,
     align: algn === 't' ? 'top' : 'bottom',
+  };
+}
+
+/**
+ * Parses text outline/stroke from run properties.
+ *
+ * Text outline is defined as:
+ * <a:ln w="...">
+ *   <a:solidFill>
+ *     <a:srgbClr val="..."/>
+ *   </a:solidFill>
+ * </a:ln>
+ */
+function parseTextOutline(rPr: Element, themeColors: ThemeColors): TextOutline | null {
+  const ln = findChildByName(rPr, 'ln');
+  if (!ln) return null;
+
+  // Parse width (in EMUs)
+  const w = getNumberAttribute(ln, 'w', 0);
+  if (w === 0) return null;
+
+  // Parse color from solidFill
+  const solidFill = findChildByName(ln, 'solidFill');
+  if (!solidFill) return null;
+
+  const color = parseColorElement(solidFill, themeColors);
+  if (!color) return null;
+
+  return {
+    color,
+    width: emuToPixels(w),
   };
 }

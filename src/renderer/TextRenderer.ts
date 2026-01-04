@@ -365,6 +365,13 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     span.style.textShadow = glowShadow;
   }
 
+  // Apply text outline/stroke
+  if (run.outline) {
+    span.style.webkitTextStroke = `${run.outline.width}px ${colorToCss(run.outline.color)}`;
+    // Paint order ensures fill is on top of stroke
+    span.style.paintOrder = 'stroke fill';
+  }
+
   // Apply hyperlink
   if (run.link) {
     const link = document.createElement('a');

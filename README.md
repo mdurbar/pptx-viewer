@@ -243,8 +243,9 @@ presentation.slides.forEach((slide, index) => {
 - **Slide masters & layouts** - Background and element inheritance from masters and layouts
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
-- **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript, highlight
+- **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript, highlight, outline
 - **Text effects** - Glow and reflection effects on text
+- **Element opacity** - Transparency support for images and other elements
 - **Character spacing & capitalization** - Letter-spacing, all caps, and small caps
 - **Text autofit** - Automatic font scaling to fit text in containers
 - **Bullet and numbered lists** - Multiple formats (arabic, alpha, roman) with proper indentation

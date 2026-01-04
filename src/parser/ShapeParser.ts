@@ -230,6 +230,9 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
   // Parse crop rectangle (srcRect element)
   const crop = parseImageCrop(blipFill);
 
+  // Parse opacity from alphaModFix element (image transparency)
+  const opacity = parseElementOpacity(blip);
+
   return {
     id,
     type: 'image',
@@ -240,6 +243,7 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
     altText,
     shadow,
     crop,
+    opacity,
   };
 }
 
@@ -1094,6 +1098,36 @@ function parseImageCrop(blipFill: Element): ImageCrop | undefined {
     right: r / 1000,
     bottom: b / 1000,
   };
+}
+
+/**
+ * Parses element opacity from blip or effect elements.
+ *
+ * Opacity can come from:
+ * - alphaModFix: Fixed alpha modification (e.g., amt="50000" = 50% opacity)
+ * - alphaMod: Alpha modulation (percentage modifier)
+ *
+ * @param element - The element to parse opacity from (e.g., blip)
+ * @returns Opacity value from 0 to 1, or undefined if no opacity specified
+ */
+function parseElementOpacity(element: Element): number | undefined {
+  // Check for alphaModFix (fixed alpha value)
+  const alphaModFix = findChildByName(element, 'alphaModFix');
+  if (alphaModFix) {
+    const amt = getNumberAttribute(alphaModFix, 'amt', 100000);
+    const opacity = amt / 100000;
+    return opacity < 1 ? opacity : undefined;
+  }
+
+  // Check for alphaMod (alpha modulation - percentage)
+  const alphaMod = findChildByName(element, 'alphaMod');
+  if (alphaMod) {
+    const amt = getNumberAttribute(alphaMod, 'amt', 100000);
+    const opacity = amt / 100000;
+    return opacity < 1 ? opacity : undefined;
+  }
+
+  return undefined;
 }
 
 /**
