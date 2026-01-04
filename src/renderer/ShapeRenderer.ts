@@ -89,7 +89,7 @@ function buildTransform(bounds: Bounds, rotation?: number): string {
  * Renders a shape element.
  */
 function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsElement): void {
-  const { bounds, shapeType, fill, stroke, shadow, text, adjustments } = shape;
+  const { bounds, shapeType, fill, stroke, shadow, text, adjustments, flipH, flipV } = shape;
 
   // Check if shape has any visible fill or stroke
   const hasVisibleFill = fill && fill.type !== 'none';
@@ -97,7 +97,7 @@ function renderShape(shape: ShapeElement, group: SVGGElement, defs: SVGDefsEleme
 
   // Only create shape element if it has visible fill or stroke
   if (hasVisibleFill || hasVisibleStroke) {
-    const shapeEl = createShapeElement(shapeType, bounds.width, bounds.height, adjustments);
+    const shapeEl = createShapeElement(shapeType, bounds.width, bounds.height, adjustments, flipH, flipV);
 
     // Apply fill
     if (hasVisibleFill) {
@@ -136,7 +136,9 @@ function createShapeElement(
   shapeType: ShapeType,
   width: number,
   height: number,
-  adjustments?: Map<string, number>
+  adjustments?: Map<string, number>,
+  flipH?: boolean,
+  flipV?: boolean
 ): SVGElement {
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   let d: string;
@@ -497,12 +499,54 @@ function createShapeElement(
     }
 
     case 'line': {
+      // Line with flip support
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', '0');
-      line.setAttribute('x2', String(width));
-      line.setAttribute('y2', String(height));
+      const x1 = flipH ? width : 0;
+      const y1 = flipV ? height : 0;
+      const x2 = flipH ? 0 : width;
+      const y2 = flipV ? 0 : height;
+      line.setAttribute('x1', String(x1));
+      line.setAttribute('y1', String(y1));
+      line.setAttribute('x2', String(x2));
+      line.setAttribute('y2', String(y2));
       return line;
+    }
+
+    case 'bentConnector3': {
+      // Bent connector (elbow) - 3 segments with one corner
+      const adj = adjustments?.get('adj1') ?? 50000; // Default to 50%
+      const midX = width * (adj / 100000);
+
+      // Determine start and end points based on flip
+      const startX = flipH ? width : 0;
+      const startY = flipV ? height : 0;
+      const endX = flipH ? 0 : width;
+      const endY = flipV ? 0 : height;
+
+      // Draw L-shaped path
+      d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      return path;
+    }
+
+    case 'curvedConnector3': {
+      // Curved connector using bezier curve
+      const startX = flipH ? width : 0;
+      const startY = flipV ? height : 0;
+      const endX = flipH ? 0 : width;
+      const endY = flipV ? 0 : height;
+
+      // Control points for smooth S-curve
+      const cp1x = (startX + endX) / 2;
+      const cp1y = startY;
+      const cp2x = (startX + endX) / 2;
+      const cp2y = endY;
+
+      d = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      return path;
     }
 
     case 'rect':

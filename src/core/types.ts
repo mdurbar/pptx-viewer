@@ -100,6 +100,10 @@ export interface ShapeElement extends BaseElement {
   path?: string;
   /** Shape adjustment values (e.g., corner radius for rounded rectangles) */
   adjustments?: Map<string, number>;
+  /** Horizontal flip */
+  flipH?: boolean;
+  /** Vertical flip */
+  flipV?: boolean;
 }
 
 /**
@@ -526,6 +530,44 @@ export interface TextRun {
   capitalization?: 'none' | 'allCaps' | 'smallCaps';
   /** Text highlight/background color */
   highlight?: Color;
+  /** Glow effect */
+  glow?: TextGlow;
+  /** Reflection effect */
+  reflection?: TextReflection;
+}
+
+/**
+ * Text glow effect.
+ */
+export interface TextGlow {
+  /** Glow radius in pixels */
+  radius: number;
+  /** Glow color */
+  color: Color;
+}
+
+/**
+ * Text reflection effect.
+ */
+export interface TextReflection {
+  /** Blur radius in pixels */
+  blurRadius: number;
+  /** Start opacity (0-1) */
+  startOpacity: number;
+  /** End opacity (0-1) */
+  endOpacity: number;
+  /** Distance from text in pixels */
+  distance: number;
+  /** Direction angle in degrees */
+  direction: number;
+  /** Fade direction angle in degrees */
+  fadeDirection: number;
+  /** Vertical scaling (percentage, e.g., 100 = 100%) */
+  scaleY: number;
+  /** Horizontal skew angle in degrees */
+  skewX: number;
+  /** Vertical alignment */
+  align: 'top' | 'bottom';
 }
 
 /**

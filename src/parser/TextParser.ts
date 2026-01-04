@@ -19,6 +19,8 @@ import type {
   BulletStyle,
   Color,
   ThemeColors,
+  TextGlow,
+  TextReflection,
 } from '../core/types';
 import type { RelationshipMap } from './RelationshipParser';
 import {
@@ -487,6 +489,22 @@ function parseRunProperties(
     }
   }
 
+  // Text effects (glow, reflection)
+  const effectLst = findChildByName(rPr, 'effectLst');
+  if (effectLst) {
+    // Parse glow effect
+    const glow = parseTextGlow(effectLst, themeColors);
+    if (glow) {
+      result.glow = glow;
+    }
+
+    // Parse reflection effect
+    const reflection = parseTextReflection(effectLst);
+    if (reflection) {
+      result.reflection = reflection;
+    }
+  }
+
   return result;
 }
 
@@ -539,4 +557,79 @@ function parseAlphaFromElement(colorElement: Element): number {
     return parseOoxmlAlpha(val);
   }
   return 1;
+}
+
+/**
+ * Parses text glow effect from effectLst.
+ *
+ * Glow is defined as:
+ * <a:glow rad="...">
+ *   <a:srgbClr val="..."/>
+ * </a:glow>
+ */
+function parseTextGlow(effectLst: Element, themeColors: ThemeColors): TextGlow | null {
+  const glow = findChildByName(effectLst, 'glow');
+  if (!glow) return null;
+
+  // Parse radius (in EMUs)
+  const rad = getNumberAttribute(glow, 'rad', 0);
+  if (rad === 0) return null;
+
+  // Parse color
+  const color = parseColorElement(glow, themeColors);
+  if (!color) return null;
+
+  return {
+    radius: emuToPixels(rad),
+    color,
+  };
+}
+
+/**
+ * Parses text reflection effect from effectLst.
+ *
+ * Reflection is defined as:
+ * <a:reflection blurRad="..." stA="..." endA="..." dist="..." dir="..."
+ *               fadeDir="..." sy="..." kx="..." algn="..."/>
+ */
+function parseTextReflection(effectLst: Element): TextReflection | null {
+  const reflection = findChildByName(effectLst, 'reflection');
+  if (!reflection) return null;
+
+  // Parse blur radius (in EMUs)
+  const blurRad = getNumberAttribute(reflection, 'blurRad', 0);
+
+  // Parse start and end opacity (in 1000ths of percent)
+  const stA = getNumberAttribute(reflection, 'stA', 100000);
+  const endA = getNumberAttribute(reflection, 'endA', 0);
+
+  // Parse distance (in EMUs)
+  const dist = getNumberAttribute(reflection, 'dist', 0);
+
+  // Parse direction (in 60000ths of a degree)
+  const dir = getNumberAttribute(reflection, 'dir', 0);
+
+  // Parse fade direction (in 60000ths of a degree)
+  const fadeDir = getNumberAttribute(reflection, 'fadeDir', 5400000);
+
+  // Parse vertical scale (in 1000ths of percent)
+  const sy = getNumberAttribute(reflection, 'sy', 100000);
+
+  // Parse horizontal skew (in 60000ths of a degree)
+  const kx = getNumberAttribute(reflection, 'kx', 0);
+
+  // Parse alignment
+  const algn = getAttribute(reflection, 'algn') || 'b';
+
+  return {
+    blurRadius: emuToPixels(blurRad),
+    startOpacity: stA / 100000,
+    endOpacity: endA / 100000,
+    distance: emuToPixels(dist),
+    direction: dir / 60000,
+    fadeDirection: fadeDir / 60000,
+    scaleY: sy / 1000,
+    skewX: kx / 60000,
+    align: algn === 't' ? 'top' : 'bottom',
+  };
 }

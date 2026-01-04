@@ -244,11 +244,13 @@ presentation.slides.forEach((slide, index) => {
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript, highlight
+- **Text effects** - Glow and reflection effects on text
 - **Character spacing & capitalization** - Letter-spacing, all caps, and small caps
 - **Text autofit** - Automatic font scaling to fit text in containers
 - **Bullet and numbered lists** - Multiple formats (arabic, alpha, roman) with proper indentation
 - **Shadow effects** - Outer and inner shadows on shapes, images, and text boxes
 - **Line arrow heads** - Triangle, stealth, diamond, oval, and arrow markers
+- **Connector lines** - Straight, bent (elbow), and curved connectors with flip support
 - **Shape adjustments** - Custom corner radius, snip sizes, star point depths, and more
 - **Hyperlinks** - Clickable links in text
 - **Images** - PNG, JPEG, GIF, etc.
@@ -322,7 +324,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 - Performance optimizations
 - Native chart rendering (currently uses fallback images)
-- Text effects (glow, reflection)
 
 ## License
 

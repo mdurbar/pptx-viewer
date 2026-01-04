@@ -4,8 +4,11 @@
  * Converts parsed TextBody into HTML elements with proper styling.
  */
 
-import type { TextBody, Paragraph, TextRun, Color, BulletStyle, TextAutofit } from '../core/types';
+import type { TextBody, Paragraph, TextRun, Color, BulletStyle, TextAutofit, TextGlow, TextReflection } from '../core/types';
 import { colorToCss } from '../utils/color';
+
+/** Counter for generating unique filter IDs */
+let filterIdCounter = 0;
 
 /**
  * Tracks numbering state for lists across paragraphs.
@@ -356,6 +359,12 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     span.style.backgroundColor = colorToCss(run.highlight);
   }
 
+  // Apply glow effect
+  if (run.glow) {
+    const glowShadow = createGlowShadow(run.glow);
+    span.style.textShadow = glowShadow;
+  }
+
   // Apply hyperlink
   if (run.link) {
     const link = document.createElement('a');
@@ -365,7 +374,17 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     link.style.color = 'inherit';
     link.style.textDecoration = 'underline';
     link.appendChild(span);
+
+    // Handle reflection with hyperlink
+    if (run.reflection) {
+      return wrapWithReflection(link, run.reflection);
+    }
     return link;
+  }
+
+  // Apply reflection effect
+  if (run.reflection) {
+    return wrapWithReflection(span, run.reflection);
   }
 
   return span;
@@ -401,4 +420,73 @@ export function renderTextBodyToSvg(
 
   foreignObject.appendChild(div);
   return foreignObject;
+}
+
+/**
+ * Creates a CSS text-shadow value for a glow effect.
+ * Uses multiple layered shadows to create a smooth glow.
+ */
+function createGlowShadow(glow: TextGlow): string {
+  const color = colorToCss(glow.color);
+  const radius = glow.radius;
+
+  // Create multiple shadow layers for a smoother glow
+  const shadows: string[] = [];
+  const layers = 3;
+
+  for (let i = 1; i <= layers; i++) {
+    const layerRadius = (radius / layers) * i;
+    shadows.push(`0 0 ${layerRadius}px ${color}`);
+  }
+
+  return shadows.join(', ');
+}
+
+/**
+ * Wraps an element with a reflection effect.
+ * Creates a container with the original element and a reflected copy.
+ */
+function wrapWithReflection(element: HTMLElement, reflection: TextReflection): HTMLElement {
+  const container = document.createElement('span');
+  container.style.display = 'inline-flex';
+  container.style.flexDirection = 'column';
+  container.style.alignItems = 'flex-start';
+
+  // Clone the element for the reflection
+  const reflectionEl = element.cloneNode(true) as HTMLElement;
+
+  // Apply reflection styles
+  reflectionEl.style.transform = `scaleY(-${reflection.scaleY / 100}) skewX(${reflection.skewX}deg)`;
+  reflectionEl.style.transformOrigin = 'center top';
+  reflectionEl.style.marginTop = `${reflection.distance}px`;
+
+  // Create gradient mask for fade effect
+  const startOpacity = reflection.startOpacity;
+  const endOpacity = reflection.endOpacity;
+
+  // Use a mask with linear gradient for the fade
+  reflectionEl.style.maskImage = `linear-gradient(to bottom, rgba(0,0,0,${startOpacity}), rgba(0,0,0,${endOpacity}))`;
+  reflectionEl.style.webkitMaskImage = `linear-gradient(to bottom, rgba(0,0,0,${startOpacity}), rgba(0,0,0,${endOpacity}))`;
+
+  // Apply blur if specified
+  if (reflection.blurRadius > 0) {
+    reflectionEl.style.filter = `blur(${reflection.blurRadius}px)`;
+  }
+
+  // Prevent reflection from being interactive
+  reflectionEl.style.pointerEvents = 'none';
+  reflectionEl.setAttribute('aria-hidden', 'true');
+
+  // Remove any links in reflection to avoid duplicate navigation
+  const links = reflectionEl.querySelectorAll('a');
+  links.forEach(link => {
+    const span = document.createElement('span');
+    span.innerHTML = link.innerHTML;
+    link.replaceWith(span);
+  });
+
+  container.appendChild(element);
+  container.appendChild(reflectionEl);
+
+  return container;
 }

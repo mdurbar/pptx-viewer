@@ -83,6 +83,8 @@ export type {
   Paragraph,
   TextRun,
   BulletStyle,
+  TextGlow,
+  TextReflection,
 
   // Theme
   Theme,

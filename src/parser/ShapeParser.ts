@@ -493,6 +493,7 @@ function parseCellBorders(tcPr: Element, themeColors: ThemeColors): CellBorders 
 
 /**
  * Parses a connector shape.
+ * Connectors can be straight lines, bent (elbow) connectors, or curved connectors.
  */
 function parseConnector(cxnSp: Element, context: ShapeParseContext): ShapeElement | null {
   const nvCxnSpPr = findChildByName(cxnSp, 'nvCxnSpPr');
@@ -508,13 +509,44 @@ function parseConnector(cxnSp: Element, context: ShapeParseContext): ShapeElemen
   const rotation = parseRotation(spPr);
   const stroke = parseStroke(spPr, context.themeColors);
 
+  // Parse flip attributes
+  const xfrm = findChildByName(spPr, 'xfrm');
+  const flipH = xfrm ? getBooleanAttribute(xfrm, 'flipH') : false;
+  const flipV = xfrm ? getBooleanAttribute(xfrm, 'flipV') : false;
+
+  // Get the connector type from prstGeom
+  const prstGeom = findChildByName(spPr, 'prstGeom');
+  let shapeType: ShapeType = 'line';
+
+  if (prstGeom) {
+    const prst = getAttribute(prstGeom, 'prst');
+    if (prst) {
+      // Map connector preset to shape type
+      if (prst === 'line' || prst === 'straightConnector1') {
+        shapeType = 'line';
+      } else if (prst.startsWith('bentConnector')) {
+        shapeType = 'bentConnector3' as ShapeType;
+      } else if (prst.startsWith('curvedConnector')) {
+        shapeType = 'curvedConnector3' as ShapeType;
+      } else {
+        shapeType = prst as ShapeType;
+      }
+    }
+  }
+
+  // Parse adjustment values for bent/curved connectors
+  const adjustments = parseAdjustments(spPr);
+
   return {
     id,
     type: 'shape',
     bounds,
     rotation,
-    shapeType: 'line',
+    shapeType,
     stroke,
+    flipH: flipH || undefined,
+    flipV: flipV || undefined,
+    adjustments: adjustments.size > 0 ? adjustments : undefined,
   };
 }
 

@@ -279,6 +279,55 @@ describe('TextParser', () => {
       expect(result.paragraphs[0].runs[0].highlight).toBeDefined();
       expect(result.paragraphs[0].runs[0].highlight?.hex).toBe('#FFFF00');
     });
+
+    it('parses text glow effect', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r>
+              <rPr>
+                <effectLst>
+                  <glow rad="101600">
+                    <srgbClr val="FF0000"/>
+                  </glow>
+                </effectLst>
+              </rPr>
+              <t>Glowing text</t>
+            </r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].runs[0].glow).toBeDefined();
+      expect(result.paragraphs[0].runs[0].glow?.color.hex).toBe('#FF0000');
+      expect(result.paragraphs[0].runs[0].glow?.radius).toBeGreaterThan(0);
+    });
+
+    it('parses text reflection effect', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r>
+              <rPr>
+                <effectLst>
+                  <reflection blurRad="12700" stA="50000" endA="0" dist="25400" dir="5400000"/>
+                </effectLst>
+              </rPr>
+              <t>Reflected text</t>
+            </r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].runs[0].reflection).toBeDefined();
+      expect(result.paragraphs[0].runs[0].reflection?.startOpacity).toBe(0.5);
+      expect(result.paragraphs[0].runs[0].reflection?.endOpacity).toBe(0);
+      expect(result.paragraphs[0].runs[0].reflection?.direction).toBe(90); // 5400000 / 60000 = 90
+    });
   });
 
   describe('parseColorElement', () => {
