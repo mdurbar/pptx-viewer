@@ -53,6 +53,7 @@ export type {
   ShapeElement,
   TextElement,
   ImageElement,
+  ImageCrop,
   GroupElement,
   TableElement,
   TableRow,

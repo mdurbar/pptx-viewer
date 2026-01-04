@@ -134,6 +134,23 @@ export interface ImageElement extends BaseElement {
   altText?: string;
   /** Shadow effect */
   shadow?: Shadow;
+  /** Crop rectangle (percentages from each edge) */
+  crop?: ImageCrop;
+}
+
+/**
+ * Image crop settings (percentages from each edge).
+ * Values are 0-100 representing percentage of image to crop from each side.
+ */
+export interface ImageCrop {
+  /** Percentage to crop from left edge */
+  left: number;
+  /** Percentage to crop from top edge */
+  top: number;
+  /** Percentage to crop from right edge */
+  right: number;
+  /** Percentage to crop from bottom edge */
+  bottom: number;
 }
 
 /**

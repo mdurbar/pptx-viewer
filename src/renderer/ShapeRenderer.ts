@@ -1033,13 +1033,51 @@ function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsEle
  * Renders an image element.
  */
 function renderImage(imageEl: ImageElement, group: SVGGElement, defs: SVGDefsElement): void {
-  const { bounds, src, altText, shadow } = imageEl;
+  const { bounds, src, altText, shadow, crop } = imageEl;
 
   const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
   image.setAttribute('href', src);
-  image.setAttribute('width', String(bounds.width));
-  image.setAttribute('height', String(bounds.height));
-  image.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  if (crop) {
+    // Calculate the visible portion of the image
+    // crop values are percentages (0-100) of how much to crop from each edge
+    const visibleWidth = 100 - crop.left - crop.right;
+    const visibleHeight = 100 - crop.top - crop.bottom;
+
+    // Calculate the full image size needed to show the cropped portion at the desired bounds
+    const fullWidth = (bounds.width * 100) / visibleWidth;
+    const fullHeight = (bounds.height * 100) / visibleHeight;
+
+    // Calculate the offset to position the visible portion correctly
+    const offsetX = -(fullWidth * crop.left) / 100;
+    const offsetY = -(fullHeight * crop.top) / 100;
+
+    // Create clip path to show only the desired portion
+    const clipId = `clip_${++defIdCounter}`;
+    const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+    clipPath.setAttribute('id', clipId);
+
+    const clipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    clipRect.setAttribute('x', '0');
+    clipRect.setAttribute('y', '0');
+    clipRect.setAttribute('width', String(bounds.width));
+    clipRect.setAttribute('height', String(bounds.height));
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+
+    // Set up the image with offset and scaling
+    image.setAttribute('x', String(offsetX));
+    image.setAttribute('y', String(offsetY));
+    image.setAttribute('width', String(fullWidth));
+    image.setAttribute('height', String(fullHeight));
+    image.setAttribute('preserveAspectRatio', 'none');
+    image.setAttribute('clip-path', `url(#${clipId})`);
+  } else {
+    // No cropping - simple case
+    image.setAttribute('width', String(bounds.width));
+    image.setAttribute('height', String(bounds.height));
+    image.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  }
 
   if (altText) {
     const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');

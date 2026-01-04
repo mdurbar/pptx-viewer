@@ -253,7 +253,7 @@ presentation.slides.forEach((slide, index) => {
 - **Connector lines** - Straight, bent (elbow), and curved connectors with flip support
 - **Shape adjustments** - Custom corner radius, snip sizes, star point depths, and more
 - **Hyperlinks** - Clickable links in text
-- **Images** - PNG, JPEG, GIF, etc.
+- **Images** - PNG, JPEG, GIF with cropping support
 - **Solid, gradient, and pattern fills** - Linear/radial gradients, 40+ pattern types, theme and preset colors
 - **Stroke/outline styles** - Color, width, dash patterns
 - **Grouped shapes** - Nested groups supported

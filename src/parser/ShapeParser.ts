@@ -14,6 +14,7 @@ import type {
   ShapeElement,
   TextElement,
   ImageElement,
+  ImageCrop,
   GroupElement,
   TableElement,
   TableRow,
@@ -226,6 +227,9 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
   const src = context.archive.getBlobUrl(imagePath, mimeType);
   if (!src) return null;
 
+  // Parse crop rectangle (srcRect element)
+  const crop = parseImageCrop(blipFill);
+
   return {
     id,
     type: 'image',
@@ -235,6 +239,7 @@ function parsePicture(pic: Element, context: ShapeParseContext): ImageElement | 
     mimeType,
     altText,
     shadow,
+    crop,
   };
 }
 
@@ -1057,6 +1062,38 @@ function parsePlaceholderInfo(nvSpPr: Element | null): PlaceholderInfo | undefin
   const idx = idxAttr ? parseInt(idxAttr, 10) : undefined;
 
   return { type, idx };
+}
+
+/**
+ * Parses image crop rectangle from blipFill.
+ *
+ * The srcRect element specifies which portion of the image to display:
+ * - l (left): percentage to crop from left edge
+ * - t (top): percentage to crop from top edge
+ * - r (right): percentage to crop from right edge
+ * - b (bottom): percentage to crop from bottom edge
+ *
+ * Values are in 1/1000ths of a percent (e.g., 50000 = 50%)
+ */
+function parseImageCrop(blipFill: Element): ImageCrop | undefined {
+  const srcRect = findChildByName(blipFill, 'srcRect');
+  if (!srcRect) return undefined;
+
+  const l = getNumberAttribute(srcRect, 'l', 0);
+  const t = getNumberAttribute(srcRect, 't', 0);
+  const r = getNumberAttribute(srcRect, 'r', 0);
+  const b = getNumberAttribute(srcRect, 'b', 0);
+
+  // If no cropping, return undefined
+  if (l === 0 && t === 0 && r === 0 && b === 0) return undefined;
+
+  // Convert from 1/1000ths of percent to percentage
+  return {
+    left: l / 1000,
+    top: t / 1000,
+    right: r / 1000,
+    bottom: b / 1000,
+  };
 }
 
 /**
