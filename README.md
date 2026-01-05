@@ -260,10 +260,10 @@ presentation.slides.forEach((slide, index) => {
 - **Grouped shapes** - Nested groups supported
 - **Theme colors and fonts** - Full theme support
 - **Slide backgrounds** - Solid and gradient
+- **Charts** - Native SVG rendering for bar, column, stacked column, pie, doughnut, line, area, and scatter charts
 
 ### Partially Supported
 
-- Charts (rendered as fallback images when available)
 - SmartArt (rendered as fallback images when available)
 
 ### Not Supported
@@ -324,7 +324,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Areas for Contribution
 
 - Performance optimizations
-- Native chart rendering (currently uses fallback images)
+- Native SmartArt rendering (currently uses fallback images)
 
 ## License
 

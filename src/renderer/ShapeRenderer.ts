@@ -11,6 +11,7 @@ import type {
   ImageElement,
   GroupElement,
   TableElement,
+  ChartElement,
   Fill,
   Stroke,
   ArrowHead,
@@ -19,10 +20,12 @@ import type {
   Bounds,
   PatternType,
   Color,
+  ThemeColors,
 } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { renderTextBodyToSvg } from './TextRenderer';
 import { renderTable } from './TableRenderer';
+import { renderChart } from './ChartRenderer';
 
 /**
  * Unique ID counter for SVG gradients and patterns.
@@ -65,6 +68,9 @@ export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGG
       break;
     case 'table':
       renderTableElement(element, group);
+      break;
+    case 'chart':
+      renderChartElement(element, group);
       break;
   }
 
@@ -1115,6 +1121,14 @@ function renderGroup(groupEl: GroupElement, group: SVGGElement, defs: SVGDefsEle
 function renderTableElement(tableEl: TableElement, group: SVGGElement): void {
   const tableFo = renderTable(tableEl);
   group.appendChild(tableFo);
+}
+
+/**
+ * Renders a chart element.
+ */
+function renderChartElement(chartEl: ChartElement, group: SVGGElement): void {
+  const chartGroup = renderChart(chartEl);
+  group.appendChild(chartGroup);
 }
 
 /**

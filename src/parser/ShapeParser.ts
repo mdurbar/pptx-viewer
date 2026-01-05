@@ -17,6 +17,7 @@ import type {
   ImageCrop,
   GroupElement,
   TableElement,
+  ChartElement,
   TableRow,
   TableCell,
   TableStyle,
@@ -36,12 +37,14 @@ import type {
 } from '../core/types';
 import type { RelationshipMap } from './RelationshipParser';
 import type { PPTXArchive } from '../core/unzip';
+import { parseChart } from './ChartParser';
 import {
   findChildByName,
   findChildrenByName,
   findFirstByName,
   getAttribute,
   getNumberAttribute,
+  getBooleanAttribute,
 } from '../utils/xml';
 import { emuToPixels, ooxmlAngleToDegrees } from '../utils/units';
 import { parseTextBody, parseColorElement } from './TextParser';
@@ -281,9 +284,9 @@ function parseGroup(grpSp: Element, context: ShapeParseContext): GroupElement | 
 
 /**
  * Parses a graphic frame (charts, tables, SmartArt).
- * Attempts to parse tables directly, falls back to images for other content.
+ * Attempts to parse tables and charts directly, falls back to images for other content.
  */
-function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): TableElement | ImageElement | null {
+function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): TableElement | ChartElement | ImageElement | null {
   // Get non-visual properties for ID
   const nvGraphicFramePr = findChildByName(graphicFrame, 'nvGraphicFramePr');
   const cNvPr = nvGraphicFramePr ? findChildByName(nvGraphicFramePr, 'cNvPr') : null;
@@ -311,7 +314,14 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): T
     return parseTable(tbl, id, bounds, rotation, context);
   }
 
-  // Try to find a fallback image for charts/SmartArt
+  // Check if this is a chart
+  const chartRef = findFirstByName(graphicData, 'chart');
+  if (chartRef) {
+    const chartResult = parseChartFromGraphic(chartRef, id, bounds, rotation, graphic, context);
+    if (chartResult) return chartResult;
+  }
+
+  // Try to find a fallback image for SmartArt or failed chart parsing
   const blip = findFirstByName(graphic, 'blip');
   if (blip) {
     const rEmbed = getAttribute(blip, 'r:embed');
@@ -337,6 +347,58 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): T
 
   // No parseable content found
   return null;
+}
+
+/**
+ * Parses a chart from a graphic reference.
+ */
+function parseChartFromGraphic(
+  chartRef: Element,
+  id: string,
+  bounds: Bounds,
+  rotation: number | undefined,
+  graphic: Element,
+  context: ShapeParseContext
+): ChartElement | null {
+  // Get chart relationship ID
+  const rId = getAttribute(chartRef, 'r:id');
+  if (!rId) return null;
+
+  // Resolve chart path
+  const chartPath = context.relationships.resolvePath(rId, context.basePath);
+  if (!chartPath) return null;
+
+  // Parse the chart
+  const parsedChart = parseChart(chartPath, context.archive, context.themeColors);
+  if (!parsedChart) return null;
+
+  // Get fallback image if available (for unsupported chart types)
+  let fallbackImage: string | undefined;
+  if (parsedChart.chartType === 'unknown') {
+    const blip = findFirstByName(graphic, 'blip');
+    if (blip) {
+      const blipRId = getAttribute(blip, 'r:embed');
+      if (blipRId) {
+        const imagePath = context.relationships.resolvePath(blipRId, context.basePath);
+        if (imagePath) {
+          const mimeType = getMimeType(imagePath);
+          fallbackImage = context.archive.getBlobUrl(imagePath, mimeType) || undefined;
+        }
+      }
+    }
+  }
+
+  return {
+    id,
+    type: 'chart',
+    bounds,
+    rotation,
+    chartType: parsedChart.chartType,
+    data: parsedChart.data,
+    title: parsedChart.title,
+    style: parsedChart.style,
+    fallbackImage,
+  };
 }
 
 /**
@@ -544,7 +606,7 @@ function parseConnector(cxnSp: Element, context: ShapeParseContext): ShapeElemen
   }
 
   // Parse adjustment values for bent/curved connectors
-  const adjustments = parseAdjustments(spPr);
+  const adjustments = parseShapeAdjustments(spPr);
 
   return {
     id,
@@ -555,7 +617,7 @@ function parseConnector(cxnSp: Element, context: ShapeParseContext): ShapeElemen
     stroke,
     flipH: flipH || undefined,
     flipV: flipV || undefined,
-    adjustments: adjustments.size > 0 ? adjustments : undefined,
+    adjustments: adjustments && adjustments.size > 0 ? adjustments : undefined,
   };
 }
 

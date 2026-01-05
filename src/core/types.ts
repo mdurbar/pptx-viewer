@@ -76,12 +76,12 @@ export interface BaseElement {
 /**
  * Discriminator for element types.
  */
-export type ElementType = 'shape' | 'text' | 'image' | 'group' | 'table';
+export type ElementType = 'shape' | 'text' | 'image' | 'group' | 'table' | 'chart';
 
 /**
  * Union type of all possible slide elements.
  */
-export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement | TableElement;
+export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement | TableElement | ChartElement;
 
 /**
  * A shape element (rectangle, ellipse, custom path, etc.).
@@ -231,6 +231,79 @@ export interface TableStyle {
   bandRow?: boolean;
   /** Alternating column bands */
   bandCol?: boolean;
+}
+
+// ============================================================================
+// Charts
+// ============================================================================
+
+/**
+ * A chart element.
+ */
+export interface ChartElement extends BaseElement {
+  type: 'chart';
+  /** Chart type */
+  chartType: ChartType;
+  /** Chart data (series, categories, values) */
+  data: ChartData;
+  /** Chart title */
+  title?: string;
+  /** Chart styling options */
+  style?: ChartStyle;
+  /** Fallback image if native rendering fails */
+  fallbackImage?: string;
+}
+
+/**
+ * Supported chart types.
+ */
+export type ChartType =
+  | 'bar'           // Horizontal bars
+  | 'column'        // Vertical bars (clustered)
+  | 'stackedColumn' // Stacked vertical bars
+  | 'pie'           // Pie chart
+  | 'doughnut'      // Doughnut chart
+  | 'line'          // Line chart
+  | 'area'          // Area chart
+  | 'scatter'       // Scatter/XY chart
+  | 'unknown';      // Unsupported chart type (will use fallback)
+
+/**
+ * Chart data structure.
+ */
+export interface ChartData {
+  /** Category labels (x-axis for most charts) */
+  categories: string[];
+  /** Data series */
+  series: ChartSeries[];
+}
+
+/**
+ * A data series in a chart.
+ */
+export interface ChartSeries {
+  /** Series name/label */
+  name?: string;
+  /** Data values */
+  values: number[];
+  /** Series color */
+  color?: Color;
+}
+
+/**
+ * Chart styling options.
+ */
+export interface ChartStyle {
+  /** Show legend */
+  showLegend?: boolean;
+  /** Legend position */
+  legendPosition?: 'top' | 'bottom' | 'left' | 'right';
+  /** Show data labels */
+  showDataLabels?: boolean;
+  /** Show gridlines */
+  showGridlines?: boolean;
+  /** Chart colors (overrides series colors) */
+  colors?: Color[];
 }
 
 // ============================================================================

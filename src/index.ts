@@ -60,6 +60,11 @@ export type {
   TableCell,
   TableStyle,
   CellBorders,
+  ChartElement,
+  ChartType,
+  ChartData,
+  ChartSeries,
+  ChartStyle,
   ElementType,
 
   // Styling
@@ -119,6 +124,7 @@ export { parsePPTX, isValidPPTX, getSlideCount } from './parser/PPTXParser';
 // Rendering
 export { renderSlide, renderSlideWithInheritance, renderSlideThumbnail, createEmptySlide } from './renderer/SlideRenderer';
 export { renderElement } from './renderer/ShapeRenderer';
+export { renderChart, type ChartRenderOptions } from './renderer/ChartRenderer';
 
 // =============================================================================
 // Errors
