@@ -7,6 +7,7 @@
 import type { ChartElement, ChartData, ChartSeries, Color, ThemeColors } from '../core/types';
 import { getSeriesColor, DEFAULT_CHART_COLORS } from '../parser/ChartParser';
 import { colorToCss } from '../utils/color';
+import { SVG_NS } from '../utils/svg';
 
 /**
  * Chart rendering options.
@@ -50,7 +51,7 @@ const DEFAULT_OPTIONS: ChartRenderOptions = {
  */
 export function renderChart(chart: ChartElement, options: Partial<ChartRenderOptions> = {}): SVGGElement {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const group = document.createElementNS(SVG_NS, 'g');
 
   // If chart type is unknown or has fallback image, render the fallback
   if (chart.chartType === 'unknown' && chart.fallbackImage) {
@@ -114,7 +115,7 @@ export function renderChart(chart: ChartElement, options: Partial<ChartRenderOpt
  * Renders a fallback image.
  */
 function renderFallbackImage(chart: ChartElement, group: SVGGElement): SVGGElement {
-  const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  const image = document.createElementNS(SVG_NS, 'image');
   image.setAttribute('x', '0');
   image.setAttribute('y', '0');
   image.setAttribute('width', String(chart.bounds.width));
@@ -129,7 +130,7 @@ function renderFallbackImage(chart: ChartElement, group: SVGGElement): SVGGEleme
  * Renders a chart title.
  */
 function renderChartTitle(group: SVGGElement, title: string, width: number, y: number): void {
-  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  const text = document.createElementNS(SVG_NS, 'text');
   text.setAttribute('x', String(width / 2));
   text.setAttribute('y', String(y));
   text.setAttribute('text-anchor', 'middle');
@@ -224,7 +225,7 @@ function renderBarChart(
 
     // Render category labels
     for (let i = 0; i < numCategories; i++) {
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const label = document.createElementNS(SVG_NS, 'text');
       label.setAttribute('x', String(area.x - 5));
       label.setAttribute('y', String(area.y + i * categorySpacing + categorySpacing / 2));
       label.setAttribute('text-anchor', 'end');
@@ -283,7 +284,7 @@ function renderBarChart(
 
     // Render category labels
     for (let i = 0; i < numCategories; i++) {
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const label = document.createElementNS(SVG_NS, 'text');
       label.setAttribute('x', String(area.x + i * categorySpacing + categorySpacing / 2));
       label.setAttribute('y', String(area.y + area.height + 15));
       label.setAttribute('text-anchor', 'middle');
@@ -337,7 +338,7 @@ function renderPieChart(
       const labelX = centerX + Math.cos(labelAngle) * labelRadius;
       const labelY = centerY + Math.sin(labelAngle) * labelRadius;
 
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const label = document.createElementNS(SVG_NS, 'text');
       label.setAttribute('x', String(labelX));
       label.setAttribute('y', String(labelY));
       label.setAttribute('text-anchor', 'middle');
@@ -365,7 +366,7 @@ function createPieSlice(
   endAngle: number,
   color: Color
 ): SVGPathElement {
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const path = document.createElementNS(SVG_NS, 'path');
 
   const x1 = cx + Math.cos(startAngle) * outerRadius;
   const y1 = cy + Math.sin(startAngle) * outerRadius;
@@ -434,7 +435,7 @@ function renderLineChart(
     }
 
     // Draw line
-    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    const polyline = document.createElementNS(SVG_NS, 'polyline');
     polyline.setAttribute('points', points.join(' '));
     polyline.setAttribute('fill', 'none');
     polyline.setAttribute('stroke', colorToCss(color));
@@ -448,7 +449,7 @@ function renderLineChart(
       const x = area.x + i * xStep;
       const y = area.y + area.height - ((s.values[i] - minValue) / range) * area.height;
 
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const circle = document.createElementNS(SVG_NS, 'circle');
       circle.setAttribute('cx', String(x));
       circle.setAttribute('cy', String(y));
       circle.setAttribute('r', '4');
@@ -461,7 +462,7 @@ function renderLineChart(
 
   // Render category labels
   for (let i = 0; i < categories.length; i++) {
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', String(area.x + i * xStep));
     label.setAttribute('y', String(area.y + area.height + 15));
     label.setAttribute('text-anchor', 'middle');
@@ -511,7 +512,7 @@ function renderAreaChart(
     }
     pathD += ` L ${area.x + (s.values.length - 1) * xStep} ${baseline} Z`;
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', pathD);
     path.setAttribute('fill', colorToCss({ ...color, alpha: 0.5 }));
     path.setAttribute('stroke', colorToCss(color));
@@ -521,7 +522,7 @@ function renderAreaChart(
 
   // Render category labels
   for (let i = 0; i < categories.length; i++) {
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', String(area.x + i * xStep));
     label.setAttribute('y', String(area.y + area.height + 15));
     label.setAttribute('text-anchor', 'middle');
@@ -568,7 +569,7 @@ function renderScatterChart(
       const x = area.x + (i / (s.values.length - 1 || 1)) * area.width;
       const y = area.y + area.height - ((s.values[i] - minValue) / range) * area.height;
 
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const circle = document.createElementNS(SVG_NS, 'circle');
       circle.setAttribute('cx', String(x));
       circle.setAttribute('cy', String(y));
       circle.setAttribute('r', '5');
@@ -593,7 +594,7 @@ function renderGridlines(
   const gridlineColor = '#E0E0E0';
 
   for (let i = 0; i <= numGridlines; i++) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const line = document.createElementNS(SVG_NS, 'line');
 
     if (horizontal) {
       const x = area.x + (i / numGridlines) * area.width;
@@ -619,7 +620,7 @@ function renderGridlines(
       ? (i / numGridlines) * maxValue
       : maxValue - (i / numGridlines) * maxValue;
 
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const label = document.createElementNS(SVG_NS, 'text');
     if (horizontal) {
       label.setAttribute('x', String(area.x + (i / numGridlines) * area.width));
       label.setAttribute('y', String(area.y + area.height + 12));
@@ -661,7 +662,7 @@ function renderLegend(
     group.appendChild(rect);
 
     // Label
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', String(x + 16));
     label.setAttribute('y', String(y + 14));
     label.setAttribute('font-family', 'Arial, sans-serif');
@@ -681,7 +682,7 @@ function renderPlaceholder(
   text: string
 ): void {
   // Background
-  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const rect = document.createElementNS(SVG_NS, 'rect');
   rect.setAttribute('x', '0');
   rect.setAttribute('y', '0');
   rect.setAttribute('width', String(bounds.width));
@@ -692,7 +693,7 @@ function renderPlaceholder(
   group.appendChild(rect);
 
   // Text
-  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  const label = document.createElementNS(SVG_NS, 'text');
   label.setAttribute('x', String(bounds.width / 2));
   label.setAttribute('y', String(bounds.height / 2));
   label.setAttribute('text-anchor', 'middle');
@@ -708,7 +709,7 @@ function renderPlaceholder(
  * Creates a rectangle element.
  */
 function createRect(x: number, y: number, width: number, height: number, color: Color): SVGRectElement {
-  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const rect = document.createElementNS(SVG_NS, 'rect');
   rect.setAttribute('x', String(x));
   rect.setAttribute('y', String(y));
   rect.setAttribute('width', String(Math.max(0, width)));

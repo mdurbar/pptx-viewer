@@ -7,25 +7,15 @@
  * Each layout is stored in ppt/slideLayouts/slideLayoutN.xml.
  */
 
-import type { SlideLayout, Background, ThemeColors, ColorMap, SlideElement, Fill } from '../core/types';
+import type { SlideLayout, Background, ThemeColors, ColorMap, SlideElement } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
-import { parseRelationships, RELATIONSHIP_TYPES } from './RelationshipParser';
+import { parseRelationships, createEmptyRelationshipMap, getRelationshipsPath, RELATIONSHIP_TYPES } from './RelationshipParser';
 import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
-import { parseColorElement } from './TextParser';
+import { parseBackground } from './BackgroundParser';
 import { parseXml, findFirstByName, findChildByName, getAttribute } from '../utils/xml';
-import { getMimeType } from '../core/unzip';
 import { XMLParseError } from '../core/errors';
 
-/**
- * Gets the path to a slide layout's relationships file.
- */
-export function getSlideLayoutRelsPath(layoutPath: string): string {
-  // Convert ppt/slideLayouts/slideLayout1.xml to ppt/slideLayouts/_rels/slideLayout1.xml.rels
-  const parts = layoutPath.split('/');
-  const filename = parts.pop()!;
-  return [...parts, '_rels', `${filename}.rels`].join('/');
-}
 
 /**
  * Parses a slide layout XML file.
@@ -57,7 +47,7 @@ export function parseSlideLayout(
   const root = doc.documentElement;
 
   // Load layout relationships
-  const relsPath = getSlideLayoutRelsPath(layoutPath);
+  const relsPath = getRelationshipsPath(layoutPath);
   const relsXml = archive.getText(relsPath);
   let relationships: RelationshipMap;
 
@@ -93,7 +83,7 @@ export function parseSlideLayout(
   // Parse background (optional override of master)
   let background: Background | undefined;
   try {
-    background = parseLayoutBackground(root, context);
+    background = parseBackground(root, context);
   } catch (error) {
     console.warn(`Failed to parse background for layout ${layoutId}:`, error);
   }
@@ -168,106 +158,3 @@ function parseColorMapOverride(root: Element): ColorMap | undefined {
   };
 }
 
-/**
- * Parses the layout background.
- */
-function parseLayoutBackground(root: Element, context: ShapeParseContext): Background | undefined {
-  const cSld = findFirstByName(root, 'cSld');
-  if (!cSld) return undefined;
-
-  const bg = findChildByName(cSld, 'bg');
-  if (!bg) return undefined;
-
-  // Try bgPr (background properties)
-  const bgPr = findChildByName(bg, 'bgPr');
-  if (bgPr) {
-    const fill = parseBackgroundFill(bgPr, context);
-    if (fill) {
-      return { fill };
-    }
-  }
-
-  // Try bgRef (background reference to theme)
-  const bgRef = findChildByName(bg, 'bgRef');
-  if (bgRef) {
-    const color = parseColorElement(bgRef, context.themeColors);
-    if (color) {
-      return {
-        fill: { type: 'solid', color },
-      };
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Parses background fill from bgPr element.
- */
-function parseBackgroundFill(bgPr: Element, context: ShapeParseContext): Fill | undefined {
-  // Check for solid fill
-  const solidFill = findChildByName(bgPr, 'solidFill');
-  if (solidFill) {
-    const color = parseColorElement(solidFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for gradient fill
-  const gradFill = findChildByName(bgPr, 'gradFill');
-  if (gradFill) {
-    const color = parseColorElement(gradFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for image fill
-  const blipFill = findChildByName(bgPr, 'blipFill');
-  if (blipFill) {
-    const blip = findChildByName(blipFill, 'blip');
-    if (blip) {
-      const rEmbed = blip.getAttributeNS(
-        'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-        'embed'
-      ) || blip.getAttribute('r:embed');
-
-      if (rEmbed) {
-        const imagePath = context.relationships.resolvePath(rEmbed, context.basePath);
-        if (imagePath) {
-          const mimeType = getMimeType(imagePath);
-          const src = context.archive.getBlobUrl(imagePath, mimeType);
-          if (src) {
-            return {
-              type: 'image',
-              src,
-              mode: 'cover',
-            };
-          }
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Creates an empty relationship map when no .rels file exists.
- */
-function createEmptyRelationshipMap(): RelationshipMap {
-  return {
-    byId: new Map(),
-    byType: new Map(),
-    get() {
-      return undefined;
-    },
-    getByType() {
-      return [];
-    },
-    resolvePath() {
-      return null;
-    },
-  };
-}

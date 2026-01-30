@@ -7,6 +7,7 @@
 
 import type { TableElement, TableRow, TableCell, CellBorders, Stroke } from '../core/types';
 import { colorToCss } from '../utils/color';
+import { SVG_NS } from '../utils/svg';
 
 /**
  * Renders a table element to an SVG foreignObject containing an HTML table.
@@ -15,7 +16,7 @@ import { colorToCss } from '../utils/color';
  * @returns SVG foreignObject element containing the HTML table
  */
 export function renderTable(table: TableElement): SVGForeignObjectElement {
-  const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+  const fo = document.createElementNS(SVG_NS, 'foreignObject');
   fo.setAttribute('width', String(table.bounds.width));
   fo.setAttribute('height', String(table.bounds.height));
 

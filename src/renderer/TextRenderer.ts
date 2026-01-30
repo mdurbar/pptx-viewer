@@ -6,9 +6,7 @@
 
 import type { TextBody, Paragraph, TextRun, Color, BulletStyle, TextAutofit, TextGlow, TextReflection } from '../core/types';
 import { colorToCss } from '../utils/color';
-
-/** Counter for generating unique filter IDs */
-let filterIdCounter = 0;
+import { SVG_NS } from '../utils/svg';
 
 /**
  * Tracks numbering state for lists across paragraphs.
@@ -411,7 +409,7 @@ export function renderTextBodyToSvg(
   width: number,
   height: number
 ): SVGForeignObjectElement {
-  const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+  const foreignObject = document.createElementNS(SVG_NS, 'foreignObject');
   foreignObject.setAttribute('width', String(width));
   foreignObject.setAttribute('height', String(height));
 
