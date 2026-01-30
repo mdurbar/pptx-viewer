@@ -4,7 +4,7 @@
  * Shapes in PPTX are defined in DrawingML and include:
  * - sp: Basic shapes (rectangles, ellipses, etc.)
  * - pic: Pictures/images
- * - graphicFrame: Charts, tables, SmartArt (we use fallback images)
+ * - graphicFrame: Charts, tables, SmartArt
  * - grpSp: Groups of shapes
  * - cxnSp: Connector lines
  */
@@ -18,6 +18,7 @@ import type {
   GroupElement,
   TableElement,
   ChartElement,
+  DiagramElement,
   TableRow,
   TableCell,
   TableStyle,
@@ -38,6 +39,7 @@ import type {
 import type { RelationshipMap } from './RelationshipParser';
 import type { PPTXArchive } from '../core/unzip';
 import { parseChart } from './ChartParser';
+import { parseDiagram } from './DiagramParser';
 import {
   findChildByName,
   findChildrenByName,
@@ -284,9 +286,9 @@ function parseGroup(grpSp: Element, context: ShapeParseContext): GroupElement | 
 
 /**
  * Parses a graphic frame (charts, tables, SmartArt).
- * Attempts to parse tables and charts directly, falls back to images for other content.
+ * Attempts to parse tables, charts, and diagrams directly, falls back to images for other content.
  */
-function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): TableElement | ChartElement | ImageElement | null {
+function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): TableElement | ChartElement | DiagramElement | ImageElement | null {
   // Get non-visual properties for ID
   const nvGraphicFramePr = findChildByName(graphicFrame, 'nvGraphicFramePr');
   const cNvPr = nvGraphicFramePr ? findChildByName(nvGraphicFramePr, 'cNvPr') : null;
@@ -308,6 +310,9 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): T
   const graphicData = findChildByName(graphic, 'graphicData');
   if (!graphicData) return null;
 
+  // Check the URI to determine content type
+  const uri = getAttribute(graphicData, 'uri') || '';
+
   // Check if this is a table
   const tbl = findChildByName(graphicData, 'tbl');
   if (tbl) {
@@ -321,7 +326,13 @@ function parseGraphicFrame(graphicFrame: Element, context: ShapeParseContext): T
     if (chartResult) return chartResult;
   }
 
-  // Try to find a fallback image for SmartArt or failed chart parsing
+  // Check if this is a SmartArt diagram
+  if (uri.includes('diagram')) {
+    const diagramResult = parseDiagramFromGraphic(graphicData, id, bounds, rotation, graphic, context);
+    if (diagramResult) return diagramResult;
+  }
+
+  // Try to find a fallback image for failed parsing
   const blip = findFirstByName(graphic, 'blip');
   if (blip) {
     const rEmbed = getAttribute(blip, 'r:embed');
@@ -397,6 +408,63 @@ function parseChartFromGraphic(
     data: parsedChart.data,
     title: parsedChart.title,
     style: parsedChart.style,
+    fallbackImage,
+  };
+}
+
+/**
+ * Parses a SmartArt diagram from a graphic reference.
+ */
+function parseDiagramFromGraphic(
+  graphicData: Element,
+  id: string,
+  bounds: Bounds,
+  rotation: number | undefined,
+  graphic: Element,
+  context: ShapeParseContext
+): DiagramElement | null {
+  // Find diagram relationship IDs
+  // The relIds element contains references to diagram parts
+  const relIds = findFirstByName(graphicData, 'relIds');
+  if (!relIds) return null;
+
+  // Get the drawing relationship ID (contains pre-computed shapes)
+  // r:dm is the drawing relationship
+  const dmRId = getAttribute(relIds, 'r:dm');
+  if (!dmRId) return null;
+
+  // Resolve drawing path
+  const drawingPath = context.relationships.resolvePath(dmRId, context.basePath);
+  if (!drawingPath) return null;
+
+  // Parse the diagram drawing
+  const result = parseDiagram(drawingPath, context.archive, context.themeColors, context.relationships, context.basePath);
+  if (!result || result.children.length === 0) {
+    // Fall through to image fallback
+    return null;
+  }
+
+  // Get fallback image for error cases
+  let fallbackImage: string | undefined;
+  const blip = findFirstByName(graphic, 'blip');
+  if (blip) {
+    const blipRId = getAttribute(blip, 'r:embed');
+    if (blipRId) {
+      const imagePath = context.relationships.resolvePath(blipRId, context.basePath);
+      if (imagePath) {
+        const mimeType = getMimeType(imagePath);
+        fallbackImage = context.archive.getBlobUrl(imagePath, mimeType) || undefined;
+      }
+    }
+  }
+
+  return {
+    id,
+    type: 'diagram',
+    bounds,
+    rotation,
+    children: result.children,
+    diagramType: result.diagramType,
     fallbackImage,
   };
 }

@@ -261,10 +261,7 @@ presentation.slides.forEach((slide, index) => {
 - **Theme colors and fonts** - Full theme support
 - **Slide backgrounds** - Solid and gradient
 - **Charts** - Native SVG rendering for bar, column, stacked column, pie, doughnut, line, area, and scatter charts
-
-### Partially Supported
-
-- SmartArt (rendered as fallback images when available)
+- **SmartArt diagrams** - Native rendering using pre-computed DrawingML shapes, with fallback to embedded images
 
 ### Not Supported
 
@@ -324,7 +321,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Areas for Contribution
 
 - Performance optimizations
-- Native SmartArt rendering (currently uses fallback images)
+- Animation and transition support
+- Video and audio playback
 
 ## License
 

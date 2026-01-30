@@ -35,6 +35,12 @@ export const RELATIONSHIP_TYPES = {
   HYPERLINK: 'relationships/hyperlink',
   NOTES_SLIDE: 'relationships/notesSlide',
   OFFICE_DOCUMENT: 'relationships/officeDocument',
+  // Diagram/SmartArt relationships
+  DIAGRAM_DRAWING: 'relationships/diagramDrawing',
+  DIAGRAM_DATA: 'relationships/diagramData',
+  DIAGRAM_LAYOUT: 'relationships/diagramLayout',
+  DIAGRAM_STYLE: 'relationships/diagramQuickStyle',
+  DIAGRAM_COLORS: 'relationships/diagramColors',
 } as const;
 
 /**

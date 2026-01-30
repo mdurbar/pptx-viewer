@@ -65,6 +65,7 @@ export type {
   ChartData,
   ChartSeries,
   ChartStyle,
+  DiagramElement,
   ElementType,
 
   // Styling

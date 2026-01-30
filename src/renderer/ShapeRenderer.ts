@@ -12,6 +12,7 @@ import type {
   GroupElement,
   TableElement,
   ChartElement,
+  DiagramElement,
   Fill,
   Stroke,
   ArrowHead,
@@ -71,6 +72,9 @@ export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGG
       break;
     case 'chart':
       renderChartElement(element, group);
+      break;
+    case 'diagram':
+      renderDiagramElement(element, group, defs);
       break;
   }
 
@@ -1129,6 +1133,32 @@ function renderTableElement(tableEl: TableElement, group: SVGGElement): void {
 function renderChartElement(chartEl: ChartElement, group: SVGGElement): void {
   const chartGroup = renderChart(chartEl);
   group.appendChild(chartGroup);
+}
+
+/**
+ * Renders a diagram (SmartArt) element.
+ *
+ * Diagrams are collections of pre-computed shapes. If native parsing
+ * succeeded, we render the child elements. Otherwise, fall back to
+ * the embedded preview image.
+ */
+function renderDiagramElement(diagram: DiagramElement, group: SVGGElement, defs: SVGDefsElement): void {
+  // If no children were parsed, use fallback image
+  if (diagram.children.length === 0 && diagram.fallbackImage) {
+    const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    image.setAttribute('width', String(diagram.bounds.width));
+    image.setAttribute('height', String(diagram.bounds.height));
+    image.setAttribute('href', diagram.fallbackImage);
+    image.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    group.appendChild(image);
+    return;
+  }
+
+  // Render child elements (they have absolute positioning from the diagram)
+  for (const child of diagram.children) {
+    const childGroup = renderElement(child, defs);
+    group.appendChild(childGroup);
+  }
 }
 
 /**

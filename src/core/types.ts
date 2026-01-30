@@ -76,12 +76,12 @@ export interface BaseElement {
 /**
  * Discriminator for element types.
  */
-export type ElementType = 'shape' | 'text' | 'image' | 'group' | 'table' | 'chart';
+export type ElementType = 'shape' | 'text' | 'image' | 'group' | 'table' | 'chart' | 'diagram';
 
 /**
  * Union type of all possible slide elements.
  */
-export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement | TableElement | ChartElement;
+export type SlideElement = ShapeElement | TextElement | ImageElement | GroupElement | TableElement | ChartElement | DiagramElement;
 
 /**
  * A shape element (rectangle, ellipse, custom path, etc.).
@@ -304,6 +304,24 @@ export interface ChartStyle {
   showGridlines?: boolean;
   /** Chart colors (overrides series colors) */
   colors?: Color[];
+}
+
+// ============================================================================
+// Diagrams (SmartArt)
+// ============================================================================
+
+/**
+ * A SmartArt diagram element.
+ * Contains pre-computed shapes from PowerPoint's diagram drawing XML.
+ */
+export interface DiagramElement extends BaseElement {
+  type: 'diagram';
+  /** Child elements (shapes, text) from the diagram */
+  children: SlideElement[];
+  /** Diagram name/type for debugging */
+  diagramType?: string;
+  /** Fallback image if native rendering fails */
+  fallbackImage?: string;
 }
 
 // ============================================================================
