@@ -26,6 +26,7 @@ import type {
 import { extractPPTX, type PPTXArchive } from './core/unzip';
 import { parsePPTX } from './parser/PPTXParser';
 import { renderSlide, createEmptySlide } from './renderer/SlideRenderer';
+import { injectFontStyles, cleanupFontStyles } from './renderer/FontLoader';
 
 /**
  * Event listener function type.
@@ -132,6 +133,11 @@ export class PPTXViewer {
       // Extract and parse
       this.archive = await extractPPTX(source);
       this.presentation = await parsePPTX(this.archive);
+
+      // Inject embedded fonts
+      if (this.presentation.fonts.size > 0) {
+        injectFontStyles(this.presentation.fonts);
+      }
 
       // Go to initial slide
       this.currentSlideIndex = Math.min(
@@ -311,6 +317,9 @@ export class PPTXViewer {
    * Should be called when the viewer is no longer needed.
    */
   destroy(): void {
+    // Clean up embedded font styles
+    cleanupFontStyles();
+
     // Clean up archive (revokes blob URLs)
     if (this.archive) {
       this.archive.cleanup();

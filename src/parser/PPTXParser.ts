@@ -18,6 +18,7 @@ import { parseTheme, createDefaultTheme } from './ThemeParser';
 import { parseSlide } from './SlideParser';
 import { parseSlideMaster } from './MasterParser';
 import { parseSlideLayout } from './LayoutParser';
+import { parseEmbeddedFonts } from './FontParser';
 
 /**
  * Parses a PPTX archive into a Presentation object.
@@ -187,6 +188,9 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     throw new PPTXError('Failed to parse any slides from the presentation');
   }
 
+  // Extract embedded fonts
+  const { fonts } = parseEmbeddedFonts(archive);
+
   return {
     metadata,
     slideSize,
@@ -194,6 +198,7 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     theme,
     slideMasters,
     slideLayouts,
+    fonts,
   };
 }
 

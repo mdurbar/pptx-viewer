@@ -23,6 +23,22 @@ export interface Presentation {
   slideMasters: Map<string, SlideMaster>;
   /** Slide layouts indexed by relationship ID */
   slideLayouts: Map<string, SlideLayout>;
+  /** Embedded fonts extracted from the presentation */
+  fonts: Map<string, EmbeddedFont>;
+}
+
+/**
+ * Represents an embedded font extracted from the presentation.
+ */
+export interface EmbeddedFont {
+  /** Font family name */
+  name: string;
+  /** Blob URL to the font file */
+  url: string;
+  /** Font format */
+  format: 'truetype' | 'opentype';
+  /** Original file path in archive */
+  path: string;
 }
 
 /**

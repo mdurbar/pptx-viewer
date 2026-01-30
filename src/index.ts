@@ -106,6 +106,9 @@ export type {
   PlaceholderInfo,
   ColorMap,
 
+  // Fonts
+  EmbeddedFont,
+
   // Viewer
   ViewerOptions,
   ViewerEvents,
