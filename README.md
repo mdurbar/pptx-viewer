@@ -262,13 +262,13 @@ presentation.slides.forEach((slide, index) => {
 - **Slide backgrounds** - Solid and gradient
 - **Charts** - Native SVG rendering for bar, column, stacked column, pie, doughnut, line, area, and scatter charts
 - **SmartArt diagrams** - Native rendering using pre-computed DrawingML shapes, with fallback to embedded images
+- **Embedded fonts** - Automatic extraction and injection of fonts embedded in PPTX files (including obfuscated ODTTF fonts)
 
 ### Not Supported
 
 - Animations and transitions
 - Videos and audio
 - 3D effects
-- Embedded fonts
 - Interactive elements
 
 ## Browser Support
