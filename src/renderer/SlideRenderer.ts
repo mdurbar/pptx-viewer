@@ -6,6 +6,7 @@
 
 import type { Slide, Size, Fill, SlideLayout, SlideMaster, Background, SlideElement } from '../core/types';
 import { colorToCss } from '../utils/color';
+import { SVG_NS, generateId } from '../utils/svg';
 import { renderElement } from './ShapeRenderer';
 
 /**
@@ -31,7 +32,7 @@ export function renderSlide(
   slideSize: Size,
   options: SlideRenderOptions = {}
 ): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
 
   // Set viewBox to original slide size for proper scaling
   svg.setAttribute('viewBox', `0 0 ${slideSize.width} ${slideSize.height}`);
@@ -48,11 +49,11 @@ export function renderSlide(
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   // Create defs for gradients/patterns
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const defs = document.createElementNS(SVG_NS, 'defs');
   svg.appendChild(defs);
 
   // Render background
-  const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const bgRect = document.createElementNS(SVG_NS, 'rect');
   bgRect.setAttribute('width', String(slideSize.width));
   bgRect.setAttribute('height', String(slideSize.height));
 
@@ -108,7 +109,7 @@ export function renderSlideWithInheritance(
   master?: SlideMaster,
   options: SlideRenderOptions = {}
 ): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
 
   // Set viewBox to original slide size for proper scaling
   svg.setAttribute('viewBox', `0 0 ${slideSize.width} ${slideSize.height}`);
@@ -125,12 +126,12 @@ export function renderSlideWithInheritance(
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   // Create defs for gradients/patterns
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const defs = document.createElementNS(SVG_NS, 'defs');
   svg.appendChild(defs);
 
   // LAYER 1: Background (resolved from inheritance chain)
   const resolvedBackground = resolveBackground(slide, layout, master);
-  const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const bgRect = document.createElementNS(SVG_NS, 'rect');
   bgRect.setAttribute('width', String(slideSize.width));
   bgRect.setAttribute('height', String(slideSize.height));
 
@@ -196,7 +197,7 @@ function resolveBackground(
  * Creates a group element for layering.
  */
 function createLayerGroup(name: string): SVGGElement {
-  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const group = document.createElementNS(SVG_NS, 'g');
   group.setAttribute('data-layer', name);
   return group;
 }
@@ -240,11 +241,11 @@ function applyBackgroundFill(rect: SVGRectElement, fill: Fill, defs: SVGDefsElem
       break;
 
     case 'gradient': {
-      const gradientId = `bg_gradient_${Date.now()}`;
+      const gradientId = generateId('bg_gradient');
 
       if (fill.gradientType === 'radial') {
         // Radial gradient
-        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+        const gradient = document.createElementNS(SVG_NS, 'radialGradient');
         gradient.setAttribute('id', gradientId);
 
         // Calculate center from fillToRect (defaults to center)
@@ -259,7 +260,7 @@ function applyBackgroundFill(rect: SVGRectElement, fill: Fill, defs: SVGDefsElem
         gradient.setAttribute('fy', `${cy}%`);
 
         for (const stop of fill.stops) {
-          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          const stopEl = document.createElementNS(SVG_NS, 'stop');
           stopEl.setAttribute('offset', `${stop.position * 100}%`);
           stopEl.setAttribute('stop-color', stop.color.hex);
           if (stop.color.alpha < 1) {
@@ -271,7 +272,7 @@ function applyBackgroundFill(rect: SVGRectElement, fill: Fill, defs: SVGDefsElem
         defs.appendChild(gradient);
       } else {
         // Linear gradient
-        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        const gradient = document.createElementNS(SVG_NS, 'linearGradient');
         gradient.setAttribute('id', gradientId);
 
         const angle = fill.angle || 0;
@@ -282,7 +283,7 @@ function applyBackgroundFill(rect: SVGRectElement, fill: Fill, defs: SVGDefsElem
         gradient.setAttribute('y2', String(50 + 50 * Math.sin(radians)) + '%');
 
         for (const stop of fill.stops) {
-          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          const stopEl = document.createElementNS(SVG_NS, 'stop');
           stopEl.setAttribute('offset', `${stop.position * 100}%`);
           stopEl.setAttribute('stop-color', stop.color.hex);
           if (stop.color.alpha < 1) {
@@ -299,14 +300,14 @@ function applyBackgroundFill(rect: SVGRectElement, fill: Fill, defs: SVGDefsElem
     }
 
     case 'image': {
-      const patternId = `bg_pattern_${Date.now()}`;
-      const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      const patternId = generateId('bg_pattern');
+      const pattern = document.createElementNS(SVG_NS, 'pattern');
       pattern.setAttribute('id', patternId);
       pattern.setAttribute('patternUnits', 'objectBoundingBox');
       pattern.setAttribute('width', '1');
       pattern.setAttribute('height', '1');
 
-      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      const image = document.createElementNS(SVG_NS, 'image');
       image.setAttribute('href', fill.src);
       image.setAttribute('width', '100%');
       image.setAttribute('height', '100%');
@@ -371,12 +372,12 @@ export function renderSlideThumbnail(
  * @returns SVG element
  */
 export function createEmptySlide(slideSize: Size, message?: string): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${slideSize.width} ${slideSize.height}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   // White background
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const bg = document.createElementNS(SVG_NS, 'rect');
   bg.setAttribute('width', String(slideSize.width));
   bg.setAttribute('height', String(slideSize.height));
   bg.setAttribute('fill', '#FFFFFF');
@@ -384,7 +385,7 @@ export function createEmptySlide(slideSize: Size, message?: string): SVGSVGEleme
 
   // Optional message
   if (message) {
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('x', String(slideSize.width / 2));
     text.setAttribute('y', String(slideSize.height / 2));
     text.setAttribute('text-anchor', 'middle');

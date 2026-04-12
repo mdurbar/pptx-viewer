@@ -23,6 +23,22 @@ export interface Presentation {
   slideMasters: Map<string, SlideMaster>;
   /** Slide layouts indexed by relationship ID */
   slideLayouts: Map<string, SlideLayout>;
+  /** Embedded fonts extracted from the presentation */
+  fonts: Map<string, EmbeddedFont>;
+}
+
+/**
+ * Represents an embedded font extracted from the presentation.
+ */
+export interface EmbeddedFont {
+  /** Font family name */
+  name: string;
+  /** Blob URL to the font file */
+  url: string;
+  /** Font format */
+  format: 'truetype' | 'opentype';
+  /** Original file path in archive */
+  path: string;
 }
 
 /**
@@ -846,6 +862,29 @@ export interface SlideLayout {
 }
 
 /**
+ * Default text run properties parsed from a master's `txStyles`.
+ *
+ * OOXML masters define `<p:txStyles>` with three sibling lists —
+ * `titleStyle`, `bodyStyle`, and `otherStyle` — each containing per-level
+ * paragraph properties whose `<a:defRPr>` carries the default font size,
+ * color, weight, etc. for slide-level placeholder runs that don't set
+ * their own. Without walking this chain, slide titles end up rendered at
+ * the browser's 16-px default in a 2560-unit viewport, which is invisibly
+ * small in the viewer.
+ *
+ * We store one default `TextRun` shape per indentation level (1-9). Index
+ * 0 corresponds to lvl1pPr, index 1 to lvl2pPr, etc.
+ */
+export interface PlaceholderTextStyles {
+  /** Per-level defaults for `titleStyle` (used by `title` and `ctrTitle`). */
+  title: Array<Omit<TextRun, 'text'>>;
+  /** Per-level defaults for `bodyStyle` (used by `body`, `subTitle`). */
+  body: Array<Omit<TextRun, 'text'>>;
+  /** Per-level defaults for `otherStyle` (used by everything else). */
+  other: Array<Omit<TextRun, 'text'>>;
+}
+
+/**
  * Represents a slide master.
  * Masters define the base styling for all slides using them.
  */
@@ -862,6 +901,12 @@ export interface SlideMaster {
   colorMap: ColorMap;
   /** Associated layout relationship IDs */
   layoutIds: string[];
+  /**
+   * Default text run properties from `<p:txStyles>`. Used to fill in
+   * missing `fontSize`/`color`/etc. on slide placeholder runs that inherit
+   * everything from the master.
+   */
+  textStyles?: PlaceholderTextStyles;
 }
 
 // ============================================================================

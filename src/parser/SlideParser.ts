@@ -5,14 +5,14 @@
  * Slides contain a shape tree (spTree) with all visual elements.
  */
 
-import type { Slide, Background, ThemeColors, Fill, SlideElement } from '../core/types';
+import type { Slide, Background, ThemeColors, SlideElement, SlideLayout, SlideMaster } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
-import { parseRelationships, RELATIONSHIP_TYPES } from './RelationshipParser';
+import { parseRelationships, createEmptyRelationshipMap, RELATIONSHIP_TYPES } from './RelationshipParser';
 import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
-import { parseColorElement } from './TextParser';
-import { parseXml, findFirstByName, findChildByName } from '../utils/xml';
-import { getSlideRelsPath, getMimeType } from '../core/unzip';
+import { parseBackground } from './BackgroundParser';
+import { parseXml, findFirstByName } from '../utils/xml';
+import { getSlideRelsPath } from '../core/unzip';
 import { XMLParseError } from '../core/errors';
 
 /**
@@ -23,6 +23,8 @@ import { XMLParseError } from '../core/errors';
  * @param archive - PPTX archive for accessing images
  * @param themeColors - Theme colors for color resolution
  * @param slidePath - Path to the slide file (for relationship resolution)
+ * @param layout - Pre-resolved slide layout (enables placeholder inheritance)
+ * @param master - Pre-resolved slide master (second-tier placeholder fallback)
  * @returns Parsed slide object
  */
 export function parseSlide(
@@ -30,7 +32,9 @@ export function parseSlide(
   slideIndex: number,
   archive: PPTXArchive,
   themeColors: ThemeColors,
-  slidePath: string
+  slidePath: string,
+  layout?: SlideLayout | null,
+  master?: SlideMaster | null
 ): Slide {
   let doc;
   try {
@@ -65,12 +69,14 @@ export function parseSlide(
     relationships,
     archive,
     basePath: slidePath,
+    layout,
+    master,
   };
 
   // Parse background (non-fatal if it fails)
   let background: Background | undefined;
   try {
-    background = parseSlideBackground(root, context);
+    background = parseBackground(root, context);
   } catch (error) {
     console.warn(`Failed to parse background for slide ${slideNumber}:`, error);
   }
@@ -109,108 +115,3 @@ function getSlideLayoutId(relationships: RelationshipMap): string | undefined {
   return undefined;
 }
 
-/**
- * Parses the slide background.
- */
-function parseSlideBackground(root: Element, context: ShapeParseContext): Background | undefined {
-  const cSld = findFirstByName(root, 'cSld');
-  if (!cSld) return undefined;
-
-  const bg = findChildByName(cSld, 'bg');
-  if (!bg) return undefined;
-
-  // Try bgPr (background properties)
-  const bgPr = findChildByName(bg, 'bgPr');
-  if (bgPr) {
-    const fill = parseBackgroundFill(bgPr, context);
-    if (fill) {
-      return { fill };
-    }
-  }
-
-  // Try bgRef (background reference to theme)
-  const bgRef = findChildByName(bg, 'bgRef');
-  if (bgRef) {
-    // For now, parse any embedded color
-    const color = parseColorElement(bgRef, context.themeColors);
-    if (color) {
-      return {
-        fill: { type: 'solid', color },
-      };
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Parses background fill from bgPr element.
- */
-function parseBackgroundFill(bgPr: Element, context: ShapeParseContext): Fill | undefined {
-  // Check for solid fill
-  const solidFill = findChildByName(bgPr, 'solidFill');
-  if (solidFill) {
-    const color = parseColorElement(solidFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for gradient fill
-  const gradFill = findChildByName(bgPr, 'gradFill');
-  if (gradFill) {
-    // Simplified gradient parsing for backgrounds
-    const color = parseColorElement(gradFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for image fill
-  const blipFill = findChildByName(bgPr, 'blipFill');
-  if (blipFill) {
-    const blip = findChildByName(blipFill, 'blip');
-    if (blip) {
-      const rEmbed = blip.getAttributeNS(
-        'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-        'embed'
-      ) || blip.getAttribute('r:embed');
-
-      if (rEmbed) {
-        const imagePath = context.relationships.resolvePath(rEmbed, context.basePath);
-        if (imagePath) {
-          const mimeType = getMimeType(imagePath);
-          const src = context.archive.getBlobUrl(imagePath, mimeType);
-          if (src) {
-            return {
-              type: 'image',
-              src,
-              mode: 'cover',
-            };
-          }
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Creates an empty relationship map when no .rels file exists.
- */
-function createEmptyRelationshipMap(): RelationshipMap {
-  return {
-    byId: new Map(),
-    byType: new Map(),
-    get() {
-      return undefined;
-    },
-    getByType() {
-      return [];
-    },
-    resolvePath() {
-      return null;
-    },
-  };
-}

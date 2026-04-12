@@ -7,25 +7,16 @@
  * Each master is stored in ppt/slideMasters/slideMasterN.xml.
  */
 
-import type { SlideMaster, Background, ThemeColors, ColorMap, SlideElement, Fill } from '../core/types';
+import type { SlideMaster, Background, ThemeColors, ColorMap, SlideElement, PlaceholderTextStyles } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
-import { parseRelationships, RELATIONSHIP_TYPES } from './RelationshipParser';
+import { parseRelationships, createEmptyRelationshipMap, getRelationshipsPath, RELATIONSHIP_TYPES } from './RelationshipParser';
 import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
-import { parseColorElement } from './TextParser';
+import { parseBackground } from './BackgroundParser';
+import { parseListStyleDefaults } from './TextParser';
 import { parseXml, findFirstByName, findChildByName, findChildrenByName, getAttribute } from '../utils/xml';
-import { getMimeType } from '../core/unzip';
 import { XMLParseError } from '../core/errors';
 
-/**
- * Gets the path to a slide master's relationships file.
- */
-export function getSlideMasterRelsPath(masterPath: string): string {
-  // Convert ppt/slideMasters/slideMaster1.xml to ppt/slideMasters/_rels/slideMaster1.xml.rels
-  const parts = masterPath.split('/');
-  const filename = parts.pop()!;
-  return [...parts, '_rels', `${filename}.rels`].join('/');
-}
 
 /**
  * Parses a slide master XML file.
@@ -57,7 +48,7 @@ export function parseSlideMaster(
   const root = doc.documentElement;
 
   // Load master relationships
-  const relsPath = getSlideMasterRelsPath(masterPath);
+  const relsPath = getRelationshipsPath(masterPath);
   const relsXml = archive.getText(relsPath);
   let relationships: RelationshipMap;
 
@@ -81,10 +72,15 @@ export function parseSlideMaster(
   // Parse color map
   const colorMap = parseColorMap(root);
 
+  // Parse master text style defaults (titleStyle / bodyStyle / otherStyle).
+  // These provide the per-level fontSize/color/etc. that slide-level
+  // placeholder runs inherit when they don't set their own rPr.
+  const textStyles = parseTextStyles(root, themeColors);
+
   // Parse background
   let background: Background | undefined;
   try {
-    background = parseMasterBackground(root, context);
+    background = parseBackground(root, context);
   } catch (error) {
     console.warn(`Failed to parse background for master ${masterId}:`, error);
   }
@@ -114,6 +110,27 @@ export function parseSlideMaster(
     elements,
     colorMap,
     layoutIds,
+    textStyles,
+  };
+}
+
+/**
+ * Parses `<p:txStyles>` from a slide master root element. Returns
+ * `undefined` when no `txStyles` element is present (e.g. partial fixtures
+ * in tests) so consumers can fall back to defaults cleanly.
+ */
+function parseTextStyles(root: Element, themeColors: ThemeColors): PlaceholderTextStyles | undefined {
+  const txStyles = findFirstByName(root, 'txStyles');
+  if (!txStyles) return undefined;
+
+  const titleStyle = findChildByName(txStyles, 'titleStyle');
+  const bodyStyle = findChildByName(txStyles, 'bodyStyle');
+  const otherStyle = findChildByName(txStyles, 'otherStyle');
+
+  return {
+    title: parseListStyleDefaults(titleStyle, themeColors),
+    body: parseListStyleDefaults(bodyStyle, themeColors),
+    other: parseListStyleDefaults(otherStyle, themeColors),
   };
 }
 
@@ -186,106 +203,3 @@ function extractLayoutIds(root: Element, relationships: RelationshipMap): string
   return layoutIds;
 }
 
-/**
- * Parses the master background.
- */
-function parseMasterBackground(root: Element, context: ShapeParseContext): Background | undefined {
-  const cSld = findFirstByName(root, 'cSld');
-  if (!cSld) return undefined;
-
-  const bg = findChildByName(cSld, 'bg');
-  if (!bg) return undefined;
-
-  // Try bgPr (background properties)
-  const bgPr = findChildByName(bg, 'bgPr');
-  if (bgPr) {
-    const fill = parseBackgroundFill(bgPr, context);
-    if (fill) {
-      return { fill };
-    }
-  }
-
-  // Try bgRef (background reference to theme)
-  const bgRef = findChildByName(bg, 'bgRef');
-  if (bgRef) {
-    const color = parseColorElement(bgRef, context.themeColors);
-    if (color) {
-      return {
-        fill: { type: 'solid', color },
-      };
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Parses background fill from bgPr element.
- */
-function parseBackgroundFill(bgPr: Element, context: ShapeParseContext): Fill | undefined {
-  // Check for solid fill
-  const solidFill = findChildByName(bgPr, 'solidFill');
-  if (solidFill) {
-    const color = parseColorElement(solidFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for gradient fill
-  const gradFill = findChildByName(bgPr, 'gradFill');
-  if (gradFill) {
-    const color = parseColorElement(gradFill, context.themeColors);
-    if (color) {
-      return { type: 'solid', color };
-    }
-  }
-
-  // Check for image fill
-  const blipFill = findChildByName(bgPr, 'blipFill');
-  if (blipFill) {
-    const blip = findChildByName(blipFill, 'blip');
-    if (blip) {
-      const rEmbed = blip.getAttributeNS(
-        'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-        'embed'
-      ) || blip.getAttribute('r:embed');
-
-      if (rEmbed) {
-        const imagePath = context.relationships.resolvePath(rEmbed, context.basePath);
-        if (imagePath) {
-          const mimeType = getMimeType(imagePath);
-          const src = context.archive.getBlobUrl(imagePath, mimeType);
-          if (src) {
-            return {
-              type: 'image',
-              src,
-              mode: 'cover',
-            };
-          }
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Creates an empty relationship map when no .rels file exists.
- */
-function createEmptyRelationshipMap(): RelationshipMap {
-  return {
-    byId: new Map(),
-    byType: new Map(),
-    get() {
-      return undefined;
-    },
-    getByType() {
-      return [];
-    },
-    resolvePath() {
-      return null;
-    },
-  };
-}

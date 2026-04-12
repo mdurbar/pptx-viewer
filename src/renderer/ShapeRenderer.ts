@@ -24,14 +24,10 @@ import type {
   ThemeColors,
 } from '../core/types';
 import { colorToCss } from '../utils/color';
+import { SVG_NS, generateId } from '../utils/svg';
 import { renderTextBodyToSvg } from './TextRenderer';
 import { renderTable } from './TableRenderer';
 import { renderChart } from './ChartRenderer';
-
-/**
- * Unique ID counter for SVG gradients and patterns.
- */
-let defIdCounter = 0;
 
 /**
  * Renders a slide element to SVG.
@@ -41,7 +37,7 @@ let defIdCounter = 0;
  * @returns SVG element group
  */
 export function renderElement(element: SlideElement, defs: SVGDefsElement): SVGGElement {
-  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const group = document.createElementNS(SVG_NS, 'g');
 
   // Apply transform (position and rotation)
   const transform = buildTransform(element.bounds, element.rotation);
@@ -155,12 +151,12 @@ function createShapeElement(
   flipH?: boolean,
   flipV?: boolean
 ): SVGElement {
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const path = document.createElementNS(SVG_NS, 'path');
   let d: string;
 
   switch (shapeType) {
     case 'ellipse': {
-      const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      const ellipse = document.createElementNS(SVG_NS, 'ellipse');
       ellipse.setAttribute('cx', String(width / 2));
       ellipse.setAttribute('cy', String(height / 2));
       ellipse.setAttribute('rx', String(width / 2));
@@ -169,7 +165,7 @@ function createShapeElement(
     }
 
     case 'roundRect': {
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const rect = document.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('width', String(width));
       rect.setAttribute('height', String(height));
       // Use adjustment value if available, otherwise default to 1/8
@@ -515,7 +511,7 @@ function createShapeElement(
 
     case 'line': {
       // Line with flip support
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const line = document.createElementNS(SVG_NS, 'line');
       const x1 = flipH ? width : 0;
       const y1 = flipV ? height : 0;
       const x2 = flipH ? 0 : width;
@@ -566,7 +562,7 @@ function createShapeElement(
 
     case 'rect':
     default: {
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const rect = document.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('width', String(width));
       rect.setAttribute('height', String(height));
       return rect;
@@ -642,11 +638,11 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
       break;
 
     case 'gradient': {
-      const gradientId = `gradient_${++defIdCounter}`;
+      const gradientId = generateId('gradient');
 
       if (fill.gradientType === 'radial') {
         // Radial gradient
-        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+        const gradient = document.createElementNS(SVG_NS, 'radialGradient');
         gradient.setAttribute('id', gradientId);
 
         // Calculate center from fillToRect (defaults to center)
@@ -662,7 +658,7 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
 
         // Add stops
         for (const stop of fill.stops) {
-          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          const stopEl = document.createElementNS(SVG_NS, 'stop');
           stopEl.setAttribute('offset', `${stop.position * 100}%`);
           stopEl.setAttribute('stop-color', stop.color.hex);
           if (stop.color.alpha < 1) {
@@ -674,7 +670,7 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
         defs.appendChild(gradient);
       } else {
         // Linear gradient
-        const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        const gradient = document.createElementNS(SVG_NS, 'linearGradient');
         gradient.setAttribute('id', gradientId);
 
         // Set gradient angle
@@ -687,7 +683,7 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
 
         // Add stops
         for (const stop of fill.stops) {
-          const stopEl = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+          const stopEl = document.createElementNS(SVG_NS, 'stop');
           stopEl.setAttribute('offset', `${stop.position * 100}%`);
           stopEl.setAttribute('stop-color', stop.color.hex);
           if (stop.color.alpha < 1) {
@@ -704,8 +700,8 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
     }
 
     case 'pattern': {
-      const patternId = `pattern_${++defIdCounter}`;
-      const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      const patternId = generateId('pattern');
+      const pattern = document.createElementNS(SVG_NS, 'pattern');
       pattern.setAttribute('id', patternId);
       pattern.setAttribute('patternUnits', 'userSpaceOnUse');
 
@@ -724,14 +720,14 @@ function applyFill(element: SVGElement, fill: Fill, defs: SVGDefsElement): void 
     }
 
     case 'image': {
-      const patternId = `pattern_${++defIdCounter}`;
-      const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      const patternId = generateId('pattern');
+      const pattern = document.createElementNS(SVG_NS, 'pattern');
       pattern.setAttribute('id', patternId);
       pattern.setAttribute('patternUnits', 'objectBoundingBox');
       pattern.setAttribute('width', '1');
       pattern.setAttribute('height', '1');
 
-      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      const image = document.createElementNS(SVG_NS, 'image');
       image.setAttribute('href', fill.src);
       image.setAttribute('width', '100%');
       image.setAttribute('height', '100%');
@@ -801,8 +797,8 @@ function createArrowMarker(
   defs: SVGDefsElement,
   position: 'start' | 'end'
 ): string {
-  const markerId = `arrow_${++defIdCounter}`;
-  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  const markerId = generateId('arrow');
+  const marker = document.createElementNS(SVG_NS, 'marker');
   marker.setAttribute('id', markerId);
   marker.setAttribute('markerUnits', 'strokeWidth');
   marker.setAttribute('orient', 'auto');
@@ -815,7 +811,7 @@ function createArrowMarker(
   const w = baseSize * widthMult;
   const h = baseSize * lengthMult;
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const path = document.createElementNS(SVG_NS, 'path');
   path.setAttribute('fill', colorToCss(stroke.color));
 
   let d: string;
@@ -871,7 +867,7 @@ function createArrowMarker(
       marker.setAttribute('refY', String(w));
       marker.setAttribute('markerWidth', String(w * 2));
       marker.setAttribute('markerHeight', String(w * 2));
-      const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      const ellipse = document.createElementNS(SVG_NS, 'ellipse');
       ellipse.setAttribute('cx', String(w));
       ellipse.setAttribute('cy', String(w));
       ellipse.setAttribute('rx', String(w));
@@ -917,8 +913,8 @@ function createArrowMarker(
  * Creates an SVG filter for shadow effects and returns the filter ID.
  */
 function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
-  const filterId = `shadow_${++defIdCounter}`;
-  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  const filterId = generateId('shadow');
+  const filter = document.createElementNS(SVG_NS, 'filter');
   filter.setAttribute('id', filterId);
 
   // Extend filter region to accommodate shadow offset and blur
@@ -934,7 +930,7 @@ function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
 
   if (shadow.type === 'outer') {
     // Use feDropShadow for outer shadows (simpler and more performant)
-    const dropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+    const dropShadow = document.createElementNS(SVG_NS, 'feDropShadow');
     dropShadow.setAttribute('dx', String(dx));
     dropShadow.setAttribute('dy', String(dy));
     dropShadow.setAttribute('stdDeviation', String(shadow.blurRadius / 2));
@@ -944,17 +940,17 @@ function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
   } else {
     // Inner shadow: more complex filter
     // 1. Create inverted shape
-    const feComponentTransfer = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer');
+    const feComponentTransfer = document.createElementNS(SVG_NS, 'feComponentTransfer');
     feComponentTransfer.setAttribute('in', 'SourceAlpha');
     feComponentTransfer.setAttribute('result', 'invert');
-    const feFuncA = document.createElementNS('http://www.w3.org/2000/svg', 'feFuncA');
+    const feFuncA = document.createElementNS(SVG_NS, 'feFuncA');
     feFuncA.setAttribute('type', 'table');
     feFuncA.setAttribute('tableValues', '1 0');
     feComponentTransfer.appendChild(feFuncA);
     filter.appendChild(feComponentTransfer);
 
     // 2. Offset the inverted shape
-    const feOffset = document.createElementNS('http://www.w3.org/2000/svg', 'feOffset');
+    const feOffset = document.createElementNS(SVG_NS, 'feOffset');
     feOffset.setAttribute('dx', String(dx));
     feOffset.setAttribute('dy', String(dy));
     feOffset.setAttribute('in', 'invert');
@@ -962,14 +958,14 @@ function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
     filter.appendChild(feOffset);
 
     // 3. Blur the offset shape
-    const feGaussianBlur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+    const feGaussianBlur = document.createElementNS(SVG_NS, 'feGaussianBlur');
     feGaussianBlur.setAttribute('stdDeviation', String(shadow.blurRadius / 2));
     feGaussianBlur.setAttribute('in', 'offsetInvert');
     feGaussianBlur.setAttribute('result', 'blur');
     filter.appendChild(feGaussianBlur);
 
     // 4. Clip to original shape
-    const feComposite = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+    const feComposite = document.createElementNS(SVG_NS, 'feComposite');
     feComposite.setAttribute('operator', 'in');
     feComposite.setAttribute('in', 'blur');
     feComposite.setAttribute('in2', 'SourceAlpha');
@@ -977,14 +973,14 @@ function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
     filter.appendChild(feComposite);
 
     // 5. Color the shadow
-    const feFlood = document.createElementNS('http://www.w3.org/2000/svg', 'feFlood');
+    const feFlood = document.createElementNS(SVG_NS, 'feFlood');
     feFlood.setAttribute('flood-color', shadow.color.hex);
     feFlood.setAttribute('flood-opacity', String(shadow.color.alpha));
     feFlood.setAttribute('result', 'color');
     filter.appendChild(feFlood);
 
     // 6. Apply color to shadow
-    const feComposite2 = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+    const feComposite2 = document.createElementNS(SVG_NS, 'feComposite');
     feComposite2.setAttribute('operator', 'in');
     feComposite2.setAttribute('in', 'color');
     feComposite2.setAttribute('in2', 'innerShadow');
@@ -992,10 +988,10 @@ function applyShadowFilter(shadow: Shadow, defs: SVGDefsElement): string {
     filter.appendChild(feComposite2);
 
     // 7. Merge with original
-    const feMerge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
-    const feMergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    const feMerge = document.createElementNS(SVG_NS, 'feMerge');
+    const feMergeNode1 = document.createElementNS(SVG_NS, 'feMergeNode');
     feMergeNode1.setAttribute('in', 'SourceGraphic');
-    const feMergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    const feMergeNode2 = document.createElementNS(SVG_NS, 'feMergeNode');
     feMergeNode2.setAttribute('in', 'coloredShadow');
     feMerge.appendChild(feMergeNode1);
     feMerge.appendChild(feMergeNode2);
@@ -1014,7 +1010,7 @@ function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsEle
 
   // If there's a fill or stroke, add a background rect
   if (fill || stroke) {
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    const rect = document.createElementNS(SVG_NS, 'rect');
     rect.setAttribute('width', String(bounds.width));
     rect.setAttribute('height', String(bounds.height));
 
@@ -1050,7 +1046,7 @@ function renderTextBox(textEl: TextElement, group: SVGGElement, defs: SVGDefsEle
 function renderImage(imageEl: ImageElement, group: SVGGElement, defs: SVGDefsElement): void {
   const { bounds, src, altText, shadow, crop } = imageEl;
 
-  const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  const image = document.createElementNS(SVG_NS, 'image');
   image.setAttribute('href', src);
 
   if (crop) {
@@ -1068,11 +1064,11 @@ function renderImage(imageEl: ImageElement, group: SVGGElement, defs: SVGDefsEle
     const offsetY = -(fullHeight * crop.top) / 100;
 
     // Create clip path to show only the desired portion
-    const clipId = `clip_${++defIdCounter}`;
-    const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+    const clipId = generateId('clip');
+    const clipPath = document.createElementNS(SVG_NS, 'clipPath');
     clipPath.setAttribute('id', clipId);
 
-    const clipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    const clipRect = document.createElementNS(SVG_NS, 'rect');
     clipRect.setAttribute('x', '0');
     clipRect.setAttribute('y', '0');
     clipRect.setAttribute('width', String(bounds.width));
@@ -1095,7 +1091,7 @@ function renderImage(imageEl: ImageElement, group: SVGGElement, defs: SVGDefsEle
   }
 
   if (altText) {
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    const title = document.createElementNS(SVG_NS, 'title');
     title.textContent = altText;
     image.appendChild(title);
   }
@@ -1145,7 +1141,7 @@ function renderChartElement(chartEl: ChartElement, group: SVGGElement): void {
 function renderDiagramElement(diagram: DiagramElement, group: SVGGElement, defs: SVGDefsElement): void {
   // If no children were parsed, use fallback image
   if (diagram.children.length === 0 && diagram.fallbackImage) {
-    const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    const image = document.createElementNS(SVG_NS, 'image');
     image.setAttribute('width', String(diagram.bounds.width));
     image.setAttribute('height', String(diagram.bounds.height));
     image.setAttribute('href', diagram.fallbackImage);
@@ -1183,10 +1179,10 @@ function createPatternContent(
   background: Color,
   size: number
 ): SVGGElement {
-  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const g = document.createElementNS(SVG_NS, 'g');
 
   // Background rectangle
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const bg = document.createElementNS(SVG_NS, 'rect');
   bg.setAttribute('width', String(size));
   bg.setAttribute('height', String(size));
   bg.setAttribute('fill', background.hex);
@@ -1216,7 +1212,7 @@ function createPatternContent(
       const pct = parseInt(pattern.replace('pct', ''), 10);
       const dotCount = Math.ceil((pct / 100) * (size * size / 4));
       for (let i = 0; i < dotCount; i++) {
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const dot = document.createElementNS(SVG_NS, 'rect');
         const x = (i * 3) % size;
         const y = Math.floor((i * 3) / size) * 2 % size;
         dot.setAttribute('x', String(x));
@@ -1238,7 +1234,7 @@ function createPatternContent(
     case 'wdHorz':
     case 'dashHorz': {
       const lineWidth = pattern.includes('lt') ? 1 : pattern.includes('dk') ? 3 : 2;
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const line = document.createElementNS(SVG_NS, 'rect');
       line.setAttribute('x', '0');
       line.setAttribute('y', String((size - lineWidth) / 2));
       line.setAttribute('width', String(size));
@@ -1257,7 +1253,7 @@ function createPatternContent(
     case 'wdVert':
     case 'dashVert': {
       const lineWidth = pattern.includes('lt') ? 1 : pattern.includes('dk') ? 3 : 2;
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const line = document.createElementNS(SVG_NS, 'rect');
       line.setAttribute('x', String((size - lineWidth) / 2));
       line.setAttribute('y', '0');
       line.setAttribute('width', String(lineWidth));
@@ -1273,7 +1269,7 @@ function createPatternContent(
     case 'smGrid':
     case 'lgGrid': {
       // Horizontal line
-      const hLine = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const hLine = document.createElementNS(SVG_NS, 'rect');
       hLine.setAttribute('x', '0');
       hLine.setAttribute('y', String(size / 2 - 0.5));
       hLine.setAttribute('width', String(size));
@@ -1282,7 +1278,7 @@ function createPatternContent(
       if (fgOpacity) hLine.setAttribute('fill-opacity', String(fgOpacity));
       g.appendChild(hLine);
       // Vertical line
-      const vLine = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const vLine = document.createElementNS(SVG_NS, 'rect');
       vLine.setAttribute('x', String(size / 2 - 0.5));
       vLine.setAttribute('y', '0');
       vLine.setAttribute('width', '1');
@@ -1298,7 +1294,7 @@ function createPatternContent(
     case 'ltDnDiag':
     case 'dkDnDiag':
     case 'wdDnDiag': {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const line = document.createElementNS(SVG_NS, 'line');
       line.setAttribute('x1', '0');
       line.setAttribute('y1', '0');
       line.setAttribute('x2', String(size));
@@ -1314,7 +1310,7 @@ function createPatternContent(
     case 'ltUpDiag':
     case 'dkUpDiag':
     case 'wdUpDiag': {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const line = document.createElementNS(SVG_NS, 'line');
       line.setAttribute('x1', '0');
       line.setAttribute('y1', String(size));
       line.setAttribute('x2', String(size));
@@ -1328,7 +1324,7 @@ function createPatternContent(
 
     // Diagonal cross
     case 'diagCross': {
-      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const line1 = document.createElementNS(SVG_NS, 'line');
       line1.setAttribute('x1', '0');
       line1.setAttribute('y1', '0');
       line1.setAttribute('x2', String(size));
@@ -1338,7 +1334,7 @@ function createPatternContent(
       if (fgOpacity) line1.setAttribute('stroke-opacity', String(fgOpacity));
       g.appendChild(line1);
 
-      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const line2 = document.createElementNS(SVG_NS, 'line');
       line2.setAttribute('x1', '0');
       line2.setAttribute('y1', String(size));
       line2.setAttribute('x2', String(size));
@@ -1354,7 +1350,7 @@ function createPatternContent(
     case 'smCheck':
     case 'lgCheck': {
       const halfSize = size / 2;
-      const rect1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const rect1 = document.createElementNS(SVG_NS, 'rect');
       rect1.setAttribute('x', '0');
       rect1.setAttribute('y', '0');
       rect1.setAttribute('width', String(halfSize));
@@ -1363,7 +1359,7 @@ function createPatternContent(
       if (fgOpacity) rect1.setAttribute('fill-opacity', String(fgOpacity));
       g.appendChild(rect1);
 
-      const rect2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      const rect2 = document.createElementNS(SVG_NS, 'rect');
       rect2.setAttribute('x', String(halfSize));
       rect2.setAttribute('y', String(halfSize));
       rect2.setAttribute('width', String(halfSize));
@@ -1379,7 +1375,7 @@ function createPatternContent(
     case 'openDmnd':
     case 'dotDmnd': {
       const half = size / 2;
-      const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      const diamond = document.createElementNS(SVG_NS, 'polygon');
       diamond.setAttribute('points', `${half},0 ${size},${half} ${half},${size} 0,${half}`);
       if (pattern === 'openDmnd') {
         diamond.setAttribute('fill', 'none');
@@ -1397,7 +1393,7 @@ function createPatternContent(
 
     // Default: simple dot pattern
     default: {
-      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const dot = document.createElementNS(SVG_NS, 'circle');
       dot.setAttribute('cx', String(size / 2));
       dot.setAttribute('cy', String(size / 2));
       dot.setAttribute('r', String(size / 4));

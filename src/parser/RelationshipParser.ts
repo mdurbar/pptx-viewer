@@ -194,3 +194,36 @@ function resolvePath(baseDir: string, relativePath: string): string {
 export function isRelationshipType(type: string, category: string): boolean {
   return type.endsWith(category);
 }
+
+/**
+ * Gets the path to a file's relationships file.
+ * Converts "ppt/path/file.xml" to "ppt/path/_rels/file.xml.rels"
+ *
+ * @param filePath - Path to the source file
+ * @returns Path to the relationships file
+ */
+export function getRelationshipsPath(filePath: string): string {
+  const parts = filePath.split('/');
+  const filename = parts.pop()!;
+  return [...parts, '_rels', `${filename}.rels`].join('/');
+}
+
+/**
+ * Creates an empty relationship map.
+ * Used when no .rels file exists for a component.
+ */
+export function createEmptyRelationshipMap(): RelationshipMap {
+  return {
+    byId: new Map(),
+    byType: new Map(),
+    get() {
+      return undefined;
+    },
+    getByType() {
+      return [];
+    },
+    resolvePath() {
+      return null;
+    },
+  };
+}

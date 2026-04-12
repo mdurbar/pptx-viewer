@@ -240,7 +240,7 @@ presentation.slides.forEach((slide, index) => {
 
 ### Fully Supported
 
-- **Slide masters & layouts** - Background and element inheritance from masters and layouts
+- **Slide masters & layouts** - Full placeholder inheritance chain (slide -> layout -> master) for bounds, text styling, and backgrounds. Works correctly with agent-generated PPTX files that rely heavily on inheritance.
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript, highlight, outline
@@ -262,13 +262,13 @@ presentation.slides.forEach((slide, index) => {
 - **Slide backgrounds** - Solid and gradient
 - **Charts** - Native SVG rendering for bar, column, stacked column, pie, doughnut, line, area, and scatter charts
 - **SmartArt diagrams** - Native rendering using pre-computed DrawingML shapes, with fallback to embedded images
+- **Embedded fonts** - Automatic extraction and injection of fonts embedded in PPTX files (including obfuscated ODTTF fonts)
 
 ### Not Supported
 
 - Animations and transitions
 - Videos and audio
 - 3D effects
-- Embedded fonts
 - Interactive elements
 
 ## Browser Support

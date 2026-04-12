@@ -13,11 +13,12 @@ import { PPTX_PATHS, getSlidePath } from '../core/unzip';
 import { MissingFileError, XMLParseError, PPTXError } from '../core/errors';
 import { parseXml, findFirstByName, findChildrenByName, getAttribute, getNumberAttribute } from '../utils/xml';
 import { emuToPixels } from '../utils/units';
-import { parseRelationships, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
+import { parseRelationships, getRelationshipsPath, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
 import { parseTheme, createDefaultTheme } from './ThemeParser';
 import { parseSlide } from './SlideParser';
 import { parseSlideMaster } from './MasterParser';
 import { parseSlideLayout } from './LayoutParser';
+import { parseEmbeddedFonts } from './FontParser';
 
 /**
  * Parses a PPTX archive into a Presentation object.
@@ -90,7 +91,10 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     theme = createDefaultTheme();
   }
 
-  // Parse slide masters
+  // Parse slide masters — keyed by file path (e.g. "ppt/slideMasters/
+  // slideMaster1.xml") so downstream consumers (PPTXViewer, simple.ts) can
+  // look up the master for any slide/layout using a stable join key that
+  // doesn't depend on scoped relationship IDs.
   const slideMasters = new Map<string, SlideMaster>();
   const masterRels = relationships.getByType(RELATIONSHIP_TYPES.SLIDE_MASTER);
 
@@ -99,20 +103,20 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
       const masterPath = `ppt/${masterRel.target.replace('../', '')}`;
       const masterXml = archive.getText(masterPath);
       if (masterXml) {
-        const master = parseSlideMaster(masterXml, masterRel.id, archive, theme.colors, masterPath);
-        slideMasters.set(masterRel.id, master);
+        const master = parseSlideMaster(masterXml, masterPath, archive, theme.colors, masterPath);
+        slideMasters.set(masterPath, master);
       }
     } catch (error) {
       console.warn(`Failed to parse slide master ${masterRel.id}:`, error);
     }
   }
 
-  // Parse slide layouts (via master relationships)
+  // Parse slide layouts — also keyed by file path. We set layout.masterId
+  // to the owning master's file path so consumers can traverse the chain
+  // via slideMasters.get(layout.masterId).
   const slideLayouts = new Map<string, SlideLayout>();
 
-  for (const [, master] of slideMasters) {
-    // Get the master's relationships file to resolve layout paths
-    const masterPath = `ppt/slideMasters/slideMaster${getNumberFromPath(relationships.get(master.id)?.target || '')}.xml`;
+  for (const [masterPath, master] of slideMasters) {
     const masterRelsPath = masterPath.replace('slideMasters/', 'slideMasters/_rels/') + '.rels';
     const masterRelsXml = archive.getText(masterRelsPath);
 
@@ -127,8 +131,12 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
             const layoutXml = archive.getText(layoutPath);
             if (layoutXml) {
               try {
-                const layout = parseSlideLayout(layoutXml, layoutId, archive, theme.colors, layoutPath);
-                slideLayouts.set(layoutId, layout);
+                const layout = parseSlideLayout(layoutXml, layoutPath, archive, theme.colors, layoutPath, master);
+                // Override masterId from the layout-scoped rId to the
+                // master's canonical path so consumers can just do
+                // `slideMasters.get(layout.masterId)`.
+                layout.masterId = masterPath;
+                slideLayouts.set(layoutPath, layout);
               } catch (error) {
                 console.warn(`Failed to parse slide layout ${layoutId}:`, error);
               }
@@ -168,8 +176,38 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
       continue;
     }
 
+    // Resolve the slide's layout (and through it, master) for placeholder
+    // inheritance. Because slideLayouts is now keyed by path, we resolve
+    // the layout path from the slide's rels file and look up directly.
+    let slideLayout: SlideLayout | undefined;
+    let slideMaster: SlideMaster | undefined;
+    let layoutPath: string | null = null;
     try {
-      const slide = parseSlide(slideXml, i, archive, theme.colors, slidePath);
+      const slideRelsXml = archive.getText(getRelationshipsPath(slidePath));
+      if (slideRelsXml) {
+        const slideRels = parseRelationships(slideRelsXml);
+        const layoutRels = slideRels.getByType(RELATIONSHIP_TYPES.SLIDE_LAYOUT);
+        if (layoutRels.length > 0) {
+          layoutPath = slideRels.resolvePath(layoutRels[0].id, slidePath);
+          if (layoutPath) {
+            slideLayout = slideLayouts.get(layoutPath);
+            if (slideLayout) {
+              slideMaster = slideMasters.get(slideLayout.masterId);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to resolve layout/master for slide ${i + 1}:`, error);
+    }
+
+    try {
+      const slide = parseSlide(slideXml, i, archive, theme.colors, slidePath, slideLayout, slideMaster);
+      // Override layoutId from the slide-scoped rId to the canonical layout
+      // path so consumers can do `slideLayouts.get(slide.layoutId)`.
+      if (layoutPath) {
+        slide.layoutId = layoutPath;
+      }
       slides.push(slide);
     } catch (error) {
       console.warn(`Failed to parse slide ${i + 1}:`, error);
@@ -187,6 +225,9 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     throw new PPTXError('Failed to parse any slides from the presentation');
   }
 
+  // Extract embedded fonts
+  const { fonts } = parseEmbeddedFonts(archive);
+
   return {
     metadata,
     slideSize,
@@ -194,6 +235,7 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     theme,
     slideMasters,
     slideLayouts,
+    fonts,
   };
 }
 

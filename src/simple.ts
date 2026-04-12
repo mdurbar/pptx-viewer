@@ -9,6 +9,8 @@ import type { Presentation, Slide, SlideLayout, SlideMaster } from './core/types
 import { extractPPTX, type PPTXArchive } from './core/unzip';
 import { parsePPTX } from './parser/PPTXParser';
 import { renderSlide, renderSlideWithInheritance } from './renderer/SlideRenderer';
+import { injectFontStyles, cleanupFontStyles } from './renderer/FontLoader';
+import { cleanupFontUrls } from './parser/FontParser';
 
 /**
  * Holds a loaded presentation and its archive for cleanup.
@@ -53,9 +55,21 @@ export async function loadPresentation(
   const archive = await extractPPTX(source);
   const presentation = await parsePPTX(archive);
 
+  // Inject embedded fonts if any
+  if (presentation.fonts.size > 0) {
+    injectFontStyles(presentation.fonts);
+  }
+
   return {
     ...presentation,
-    cleanup: () => archive.cleanup(),
+    cleanup: () => {
+      // Clean up font styles from document
+      cleanupFontStyles();
+      // Revoke font blob URLs
+      cleanupFontUrls(presentation.fonts);
+      // Clean up archive (images, etc.)
+      archive.cleanup();
+    },
   };
 }
 
