@@ -27,6 +27,7 @@ import { extractPPTX, type PPTXArchive } from './core/unzip';
 import { parsePPTX } from './parser/PPTXParser';
 import { renderSlideWithInheritance, createEmptySlide } from './renderer/SlideRenderer';
 import { injectFontStyles, cleanupFontStyles } from './renderer/FontLoader';
+import { cleanupFontUrls } from './parser/FontParser';
 
 /**
  * Event listener function type.
@@ -317,8 +318,11 @@ export class PPTXViewer {
    * Should be called when the viewer is no longer needed.
    */
   destroy(): void {
-    // Clean up embedded font styles
+    // Clean up embedded font styles and revoke font blob URLs
     cleanupFontStyles();
+    if (this.presentation?.fonts) {
+      cleanupFontUrls(this.presentation.fonts);
+    }
 
     // Clean up archive (revokes blob URLs)
     if (this.archive) {
