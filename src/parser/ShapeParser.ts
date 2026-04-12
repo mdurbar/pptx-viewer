@@ -196,24 +196,24 @@ function parseShape(sp: Element, context: ShapeParseContext): ShapeElement | Tex
 
   // Apply text-style inheritance for placeholder shapes. The OOXML
   // precedence chain for run properties is (highest → lowest):
-  //   1. Slide run's own rPr (already parsed above)
+  //   1. Slide run's own rPr (already parsed above, never overwritten)
   //   2. Layout placeholder's text defaults (closer source wins)
   //   3. Master txStyles (titleStyle/bodyStyle/otherStyle by ph type)
   //
-  // We apply in reverse order (lowest priority first) using "fill gaps"
-  // semantics: master txStyles fill unset properties, then layout
-  // placeholder overrides whatever the master set.
+  // We apply highest-priority inherited source first using fill-gap
+  // semantics throughout: layout fills gaps the slide didn't set, then
+  // master fills whatever is still missing.
   if (text && placeholder) {
-    // Layer 3: master txStyles (lowest priority inherited source)
-    if (context.master?.textStyles) {
-      inheritPlaceholderTextStyles(text, placeholder, context.master.textStyles);
-    }
-    // Layer 2: layout placeholder text runs override master defaults
+    // Layer 2: layout placeholder text runs (fill gaps only)
     if (matchedLayoutPlaceholder) {
       const layoutText = (matchedLayoutPlaceholder as any).text as TextBody | undefined;
       if (layoutText) {
         inheritTextDefaultsFromPlaceholder(text, layoutText);
       }
+    }
+    // Layer 3: master txStyles fills remaining gaps
+    if (context.master?.textStyles) {
+      inheritPlaceholderTextStyles(text, placeholder, context.master.textStyles);
     }
   }
 
@@ -1356,14 +1356,14 @@ function inheritPlaceholderTextStyles(
 }
 
 /**
- * Copies text run properties from a layout placeholder's text body onto
- * the slide's text body, OVERWRITING any properties that were previously
- * set by a lower-priority source (master txStyles). This gives layout-level
- * overrides precedence over master defaults, matching the OOXML inheritance
- * chain where the layout sits between the slide and the master.
+ * Fills in missing text run properties on the slide from a layout
+ * placeholder's text body, using fill-gap semantics (only sets properties
+ * the slide run hasn't already set in its own rPr). Called BEFORE the
+ * master txStyles pass so layout defaults take precedence over master
+ * defaults, while the slide's own rPr is never overwritten.
  *
  * Only copies from runs at matching paragraph indices (first layout
- * paragraph's first run → first slide paragraph's runs, etc.). This
+ * paragraph's first run -> first slide paragraph's runs, etc.). This
  * avoids applying a title's style to a subtitle's paragraph.
  */
 function inheritTextDefaultsFromPlaceholder(
@@ -1380,37 +1380,16 @@ function inheritTextDefaultsFromPlaceholder(
     const layoutRun = layoutPara.runs[0];
 
     for (const run of text.paragraphs[pi].runs) {
-      // Layout overrides master: unconditionally copy defined properties.
-      if (layoutRun.fontSize !== undefined) run.fontSize = layoutRun.fontSize;
-      if (layoutRun.fontFamily !== undefined) run.fontFamily = layoutRun.fontFamily;
-      if (layoutRun.color !== undefined) run.color = layoutRun.color;
-      if (layoutRun.bold !== undefined) run.bold = layoutRun.bold;
-      if (layoutRun.italic !== undefined) run.italic = layoutRun.italic;
-      if (layoutRun.characterSpacing !== undefined) run.characterSpacing = layoutRun.characterSpacing;
-      if (layoutRun.capitalization !== undefined) run.capitalization = layoutRun.capitalization;
+      // Fill-gap: only set properties the slide run doesn't already have.
+      if (run.fontSize === undefined && layoutRun.fontSize !== undefined) run.fontSize = layoutRun.fontSize;
+      if (run.fontFamily === undefined && layoutRun.fontFamily !== undefined) run.fontFamily = layoutRun.fontFamily;
+      if (run.color === undefined && layoutRun.color !== undefined) run.color = layoutRun.color;
+      if (run.bold === undefined && layoutRun.bold !== undefined) run.bold = layoutRun.bold;
+      if (run.italic === undefined && layoutRun.italic !== undefined) run.italic = layoutRun.italic;
+      if (run.characterSpacing === undefined && layoutRun.characterSpacing !== undefined) run.characterSpacing = layoutRun.characterSpacing;
+      if (run.capitalization === undefined && layoutRun.capitalization !== undefined) run.capitalization = layoutRun.capitalization;
     }
   }
-}
-
-/**
- * Walks the placeholder inheritance chain (layout → master) to find bounds
- * for a slide-level placeholder shape that has no xfrm of its own. Returns
- * null if no matching placeholder is found anywhere.
- */
-function resolvePlaceholderBounds(
-  placeholder: PlaceholderInfo,
-  layout?: SlideLayout | null,
-  master?: SlideMaster | null
-): Bounds | null {
-  if (layout) {
-    const match = findMatchingPlaceholder(placeholder, layout.elements);
-    if (match) return match.bounds;
-  }
-  if (master) {
-    const match = findMatchingPlaceholder(placeholder, master.elements);
-    if (match) return match.bounds;
-  }
-  return null;
 }
 
 /**

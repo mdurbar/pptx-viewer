@@ -13,8 +13,7 @@ import { PPTX_PATHS, getSlidePath } from '../core/unzip';
 import { MissingFileError, XMLParseError, PPTXError } from '../core/errors';
 import { parseXml, findFirstByName, findChildrenByName, getAttribute, getNumberAttribute } from '../utils/xml';
 import { emuToPixels } from '../utils/units';
-import { getSlideRelsPath } from '../core/unzip';
-import { parseRelationships, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
+import { parseRelationships, getRelationshipsPath, RELATIONSHIP_TYPES, isRelationshipType } from './RelationshipParser';
 import { parseTheme, createDefaultTheme } from './ThemeParser';
 import { parseSlide } from './SlideParser';
 import { parseSlideMaster } from './MasterParser';
@@ -184,7 +183,7 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     let slideMaster: SlideMaster | undefined;
     let layoutPath: string | null = null;
     try {
-      const slideRelsXml = archive.getText(getSlideRelsPath(i + 1));
+      const slideRelsXml = archive.getText(getRelationshipsPath(slidePath));
       if (slideRelsXml) {
         const slideRels = parseRelationships(slideRelsXml);
         const layoutRels = slideRels.getByType(RELATIONSHIP_TYPES.SLIDE_LAYOUT);
