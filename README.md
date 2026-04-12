@@ -240,7 +240,7 @@ presentation.slides.forEach((slide, index) => {
 
 ### Fully Supported
 
-- **Slide masters & layouts** - Background and element inheritance from masters and layouts
+- **Slide masters & layouts** - Full placeholder inheritance chain (slide -> layout -> master) for bounds, text styling, and backgrounds. Works correctly with agent-generated PPTX files that rely heavily on inheritance.
 - **Tables** - Full table rendering with cell styling, borders, and text formatting
 - **50+ shape types** - Rectangles, ellipses, triangles, stars (4-12 points), arrows (all directions), callouts, hearts, clouds, and more
 - **Text with formatting** - Font family, size, color, bold, italic, underline, strikethrough, subscript, superscript, highlight, outline
