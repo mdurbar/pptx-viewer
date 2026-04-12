@@ -25,7 +25,7 @@ import type {
 } from './core/types';
 import { extractPPTX, type PPTXArchive } from './core/unzip';
 import { parsePPTX } from './parser/PPTXParser';
-import { renderSlide, createEmptySlide } from './renderer/SlideRenderer';
+import { renderSlideWithInheritance, createEmptySlide } from './renderer/SlideRenderer';
 import { injectFontStyles, cleanupFontStyles } from './renderer/FontLoader';
 
 /**
@@ -507,8 +507,22 @@ export class PPTXViewer {
       displayWidth = displayHeight * aspectRatio;
     }
 
-    // Render slide
-    const svg = renderSlide(slide, slideSize, {
+    // Resolve layout + master for this slide so the renderer can draw
+    // the master background, layout shapes, and master decorations.
+    let layout = slide.layoutId
+      ? this.presentation.slideLayouts.get(slide.layoutId)
+      : undefined;
+    let master = layout?.masterId
+      ? this.presentation.slideMasters.get(layout.masterId)
+      : undefined;
+    // If no layout matched, fall back to the first master for its background.
+    if (!master && this.presentation.slideMasters.size > 0) {
+      master = this.presentation.slideMasters.values().next().value;
+    }
+
+    // Render slide with full master/layout inheritance so background,
+    // master shapes, layout shapes, and slide content all draw.
+    const svg = renderSlideWithInheritance(slide, slideSize, layout, master, {
       width: displayWidth,
       height: displayHeight,
     });

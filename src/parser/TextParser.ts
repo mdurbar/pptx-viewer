@@ -385,9 +385,63 @@ function parseTextRun(
 }
 
 /**
- * Parses run properties (font, size, color, etc.).
+ * Extracts per-level default `TextRun` properties from a container that
+ * holds `<a:lvl1pPr>`..`<a:lvl9pPr>` children. Used both for `<a:lstStyle>`
+ * (placeholder text body) and `<p:titleStyle>`/`<p:bodyStyle>`/
+ * `<p:otherStyle>` inside `<p:txStyles>` — they share the same shape.
+ *
+ * Each level's `<a:defRPr>` is parsed via `parseRunProperties`. Levels
+ * with no entry yield `{}`, so callers can index by paragraph level
+ * without needing to bounds-check.
  */
-function parseRunProperties(
+export function parseListStyleDefaults(
+  container: Element | null,
+  themeColors: ThemeColors
+): Array<Omit<TextRun, 'text'>> {
+  const result: Array<Omit<TextRun, 'text'>> = [];
+  if (!container) return result;
+
+  // CT_TextListStyle allows a <a:defPPr> before the numbered levels. Its
+  // defRPr is the fallback for any level that doesn't define its own.
+  // Without this, masters that keep all their defaults in defPPr (instead
+  // of repeating them in every lvlNpPr) produce no inherited text styling.
+  const defPPr = findChildByName(container, 'defPPr');
+  const globalDefRPr = defPPr ? findChildByName(defPPr, 'defRPr') : null;
+  const globalDefaults = globalDefRPr ? parseRunProperties(globalDefRPr, themeColors) : {};
+
+  // Levels are 1-indexed in OOXML; we walk 1..9 and store at index lvl-1.
+  for (let lvl = 1; lvl <= 9; lvl++) {
+    const lvlPr = findChildByName(container, `lvl${lvl}pPr`);
+    if (!lvlPr) {
+      // No level-specific entry — use the global defPPr defaults (if any).
+      result.push({ ...globalDefaults });
+      continue;
+    }
+    const defRPr = findChildByName(lvlPr, 'defRPr');
+    if (defRPr) {
+      // Merge: level-specific properties win, global fills remaining gaps.
+      const levelDefaults = parseRunProperties(defRPr, themeColors);
+      result.push({ ...globalDefaults, ...levelDefaults });
+    } else {
+      result.push({ ...globalDefaults });
+    }
+  }
+
+  // Trim trailing empty levels so consumers can tell at a glance whether
+  // any defaults exist (an all-empty array round-trips to `length === 0`).
+  while (result.length > 0 && Object.keys(result[result.length - 1]).length === 0) {
+    result.pop();
+  }
+  return result;
+}
+
+/**
+ * Parses run properties (font, size, color, etc.). Exported so callers
+ * outside this module (the master `txStyles` parser, the placeholder
+ * inheritance resolver) can extract `defRPr` defaults using exactly the
+ * same rules as a regular slide run.
+ */
+export function parseRunProperties(
   rPr: Element | null,
   themeColors: ThemeColors,
   relationships?: RelationshipMap

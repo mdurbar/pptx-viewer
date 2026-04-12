@@ -5,7 +5,7 @@
  * Slides contain a shape tree (spTree) with all visual elements.
  */
 
-import type { Slide, Background, ThemeColors, SlideElement } from '../core/types';
+import type { Slide, Background, ThemeColors, SlideElement, SlideLayout, SlideMaster } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
 import { parseRelationships, createEmptyRelationshipMap, RELATIONSHIP_TYPES } from './RelationshipParser';
@@ -23,6 +23,8 @@ import { XMLParseError } from '../core/errors';
  * @param archive - PPTX archive for accessing images
  * @param themeColors - Theme colors for color resolution
  * @param slidePath - Path to the slide file (for relationship resolution)
+ * @param layout - Pre-resolved slide layout (enables placeholder inheritance)
+ * @param master - Pre-resolved slide master (second-tier placeholder fallback)
  * @returns Parsed slide object
  */
 export function parseSlide(
@@ -30,7 +32,9 @@ export function parseSlide(
   slideIndex: number,
   archive: PPTXArchive,
   themeColors: ThemeColors,
-  slidePath: string
+  slidePath: string,
+  layout?: SlideLayout | null,
+  master?: SlideMaster | null
 ): Slide {
   let doc;
   try {
@@ -65,6 +69,8 @@ export function parseSlide(
     relationships,
     archive,
     basePath: slidePath,
+    layout,
+    master,
   };
 
   // Parse background (non-fatal if it fails)

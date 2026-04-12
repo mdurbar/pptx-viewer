@@ -418,4 +418,169 @@ describe('ShapeParser', () => {
       expect(elements).toHaveLength(0);
     });
   });
+
+  describe('placeholder inheritance', () => {
+    // A slide-level placeholder shape with empty spPr (no xfrm). This is the
+    // exact shape reported in the bug — agent-generated PPTX files lean on
+    // layout/master inheritance for bounds.
+    const placeholderSlideXml = `
+      <spTree>
+        <sp>
+          <nvSpPr>
+            <cNvPr id="100" name="Title"/>
+            <cNvSpPr txBox="1"/>
+            <nvPr><ph type="ctrTitle"/></nvPr>
+          </nvSpPr>
+          <spPr>
+            <prstGeom prst="rect"><avLst/></prstGeom>
+          </spPr>
+          <txBody>
+            <bodyPr/><lstStyle/>
+            <p><r><t>Northstar Labs</t></r></p>
+          </txBody>
+        </sp>
+      </spTree>
+    `;
+
+    function makeTextElement(
+      phType: any,
+      idx: number | undefined,
+      x: number,
+      y: number,
+      w: number,
+      h: number
+    ): any {
+      return {
+        id: `ph-${phType}-${idx ?? 'noidx'}`,
+        type: 'text',
+        bounds: { x, y, width: w, height: h },
+        placeholder: idx !== undefined ? { type: phType, idx } : { type: phType },
+        text: { paragraphs: [] },
+      };
+    }
+
+    function makeLayout(elements: any[]): any {
+      return {
+        id: 'rId1',
+        masterId: 'rId1',
+        elements,
+        showMasterShapes: true,
+      };
+    }
+
+    function makeMaster(elements: any[]): any {
+      return {
+        id: 'rId1',
+        elements,
+        colorMap: {},
+        layoutIds: [],
+      };
+    }
+
+    it('inherits bounds from layout placeholder (type match)', () => {
+      const layout = makeLayout([makeTextElement('ctrTitle', undefined, 100, 50, 800, 200)]);
+      const xml = parseXml(placeholderSlideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout });
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0].bounds).toEqual({ x: 100, y: 50, width: 800, height: 200 });
+    });
+
+    it('inherits bounds from master when layout has no matching placeholder', () => {
+      const layout = makeLayout([makeTextElement('body', 1, 10, 10, 20, 20)]);
+      const master = makeMaster([makeTextElement('ctrTitle', undefined, 42, 24, 600, 100)]);
+      const xml = parseXml(placeholderSlideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout, master });
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0].bounds).toEqual({ x: 42, y: 24, width: 600, height: 100 });
+    });
+
+    it('drops the shape when neither layout nor master has matching bounds', () => {
+      const layout = makeLayout([makeTextElement('body', 1, 10, 10, 20, 20)]);
+      const master = makeMaster([makeTextElement('ftr', undefined, 0, 700, 960, 40)]);
+      const xml = parseXml(placeholderSlideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout, master });
+
+      expect(elements).toHaveLength(0);
+    });
+
+    it('matches ctrTitle on the slide against a layout title placeholder', () => {
+      // Slide has ctrTitle, layout only has plain title — they should be
+      // considered equivalent per ECMA-376 §19.3.1.36.
+      const layout = makeLayout([makeTextElement('title', undefined, 50, 50, 500, 80)]);
+      const xml = parseXml(placeholderSlideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout });
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0].bounds).toEqual({ x: 50, y: 50, width: 500, height: 80 });
+    });
+
+    it('matches ctrTitle on the layout against a slide title placeholder', () => {
+      // Reverse: slide has plain title, layout has ctrTitle — still a match.
+      const layout = makeLayout([makeTextElement('ctrTitle', undefined, 12, 34, 300, 60)]);
+      const slideXml = `
+        <spTree>
+          <sp>
+            <nvSpPr>
+              <cNvPr id="101" name="Title"/>
+              <nvPr><ph type="title"/></nvPr>
+            </nvSpPr>
+            <spPr><prstGeom prst="rect"/></spPr>
+            <txBody><p><r><t>Hello</t></r></p></txBody>
+          </sp>
+        </spTree>
+      `;
+      const xml = parseXml(slideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout });
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0].bounds).toEqual({ x: 12, y: 34, width: 300, height: 60 });
+    });
+
+    it('prefers idx match over type match', () => {
+      // Layout has two body placeholders — idx=1 and idx=2. Slide requests
+      // idx=2, so we must get the idx=2 bounds (not the idx=1 bounds even
+      // though both type-match).
+      const layout = makeLayout([
+        makeTextElement('body', 1, 100, 100, 200, 200),
+        makeTextElement('body', 2, 500, 500, 300, 300),
+      ]);
+      const slideXml = `
+        <spTree>
+          <sp>
+            <nvSpPr>
+              <cNvPr id="102" name="Body"/>
+              <nvPr><ph type="body" idx="2"/></nvPr>
+            </nvSpPr>
+            <spPr><prstGeom prst="rect"/></spPr>
+            <txBody><p><r><t>Point</t></r></p></txBody>
+          </sp>
+        </spTree>
+      `;
+      const xml = parseXml(slideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout });
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0].bounds).toEqual({ x: 500, y: 500, width: 300, height: 300 });
+    });
+
+    it('does not inherit when no placeholder is declared on the slide shape', () => {
+      // Shape has no <ph> element at all — not a placeholder, so no layout
+      // lookup should happen. It should be dropped as before.
+      const layout = makeLayout([makeTextElement('ctrTitle', undefined, 100, 50, 800, 200)]);
+      const slideXml = `
+        <spTree>
+          <sp>
+            <nvSpPr><cNvPr id="103" name="Plain"/></nvSpPr>
+            <spPr><prstGeom prst="rect"/></spPr>
+          </sp>
+        </spTree>
+      `;
+      const xml = parseXml(slideXml);
+      const elements = parseShapeTree(xml.documentElement, { ...mockContext, layout });
+
+      expect(elements).toHaveLength(0);
+    });
+  });
 });

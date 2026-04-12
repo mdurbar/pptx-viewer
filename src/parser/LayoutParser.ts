@@ -7,7 +7,7 @@
  * Each layout is stored in ppt/slideLayouts/slideLayoutN.xml.
  */
 
-import type { SlideLayout, Background, ThemeColors, ColorMap, SlideElement } from '../core/types';
+import type { SlideLayout, SlideMaster, Background, ThemeColors, ColorMap, SlideElement } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
 import { parseRelationships, createEmptyRelationshipMap, getRelationshipsPath, RELATIONSHIP_TYPES } from './RelationshipParser';
@@ -25,6 +25,11 @@ import { XMLParseError } from '../core/errors';
  * @param archive - PPTX archive for accessing images
  * @param themeColors - Theme colors for color resolution
  * @param layoutPath - Path to the layout file (for relationship resolution)
+ * @param master - Pre-resolved parent master for placeholder inheritance.
+ *   Layout placeholders with empty spPr (common for title/body/sldNum
+ *   placeholders in agent-generated decks) chain up to the master for
+ *   their bounds. There is no infinite-recursion risk because masters do
+ *   not inherit from layouts.
  * @returns Parsed slide layout object
  */
 export function parseSlideLayout(
@@ -32,7 +37,8 @@ export function parseSlideLayout(
   layoutId: string,
   archive: PPTXArchive,
   themeColors: ThemeColors,
-  layoutPath: string
+  layoutPath: string,
+  master?: SlideMaster | null
 ): SlideLayout {
   let doc;
   try {
@@ -60,12 +66,18 @@ export function parseSlideLayout(
     relationships = createEmptyRelationshipMap();
   }
 
-  // Create parsing context
+  // Create parsing context. The master is plumbed in so layout-level
+  // placeholder shapes that have no xfrm of their own can inherit bounds
+  // from the master's matching placeholder. `layout` stays null because
+  // layouts are the top of their own chain from the perspective of their
+  // own shapes.
   const context: ShapeParseContext = {
     themeColors,
     relationships,
     archive,
     basePath: layoutPath,
+    layout: null,
+    master,
   };
 
   // Get the master ID from relationships

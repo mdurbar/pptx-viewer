@@ -7,12 +7,13 @@
  * Each master is stored in ppt/slideMasters/slideMasterN.xml.
  */
 
-import type { SlideMaster, Background, ThemeColors, ColorMap, SlideElement } from '../core/types';
+import type { SlideMaster, Background, ThemeColors, ColorMap, SlideElement, PlaceholderTextStyles } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import type { RelationshipMap } from './RelationshipParser';
 import { parseRelationships, createEmptyRelationshipMap, getRelationshipsPath, RELATIONSHIP_TYPES } from './RelationshipParser';
 import { parseShapeTree, type ShapeParseContext } from './ShapeParser';
 import { parseBackground } from './BackgroundParser';
+import { parseListStyleDefaults } from './TextParser';
 import { parseXml, findFirstByName, findChildByName, findChildrenByName, getAttribute } from '../utils/xml';
 import { XMLParseError } from '../core/errors';
 
@@ -71,6 +72,11 @@ export function parseSlideMaster(
   // Parse color map
   const colorMap = parseColorMap(root);
 
+  // Parse master text style defaults (titleStyle / bodyStyle / otherStyle).
+  // These provide the per-level fontSize/color/etc. that slide-level
+  // placeholder runs inherit when they don't set their own rPr.
+  const textStyles = parseTextStyles(root, themeColors);
+
   // Parse background
   let background: Background | undefined;
   try {
@@ -104,6 +110,27 @@ export function parseSlideMaster(
     elements,
     colorMap,
     layoutIds,
+    textStyles,
+  };
+}
+
+/**
+ * Parses `<p:txStyles>` from a slide master root element. Returns
+ * `undefined` when no `txStyles` element is present (e.g. partial fixtures
+ * in tests) so consumers can fall back to defaults cleanly.
+ */
+function parseTextStyles(root: Element, themeColors: ThemeColors): PlaceholderTextStyles | undefined {
+  const txStyles = findFirstByName(root, 'txStyles');
+  if (!txStyles) return undefined;
+
+  const titleStyle = findChildByName(txStyles, 'titleStyle');
+  const bodyStyle = findChildByName(txStyles, 'bodyStyle');
+  const otherStyle = findChildByName(txStyles, 'otherStyle');
+
+  return {
+    title: parseListStyleDefaults(titleStyle, themeColors),
+    body: parseListStyleDefaults(bodyStyle, themeColors),
+    other: parseListStyleDefaults(otherStyle, themeColors),
   };
 }
 
