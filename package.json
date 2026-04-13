@@ -1,6 +1,6 @@
 {
   "name": "pptx-viewer",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A lightweight PPTX viewer for the browser with minimal dependencies",
   "author": "Mufaddal Durbar",
   "license": "MIT",

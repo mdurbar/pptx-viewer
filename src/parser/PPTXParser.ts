@@ -7,7 +7,7 @@
  * - Individual slides
  */
 
-import type { Presentation, PresentationMetadata, Size, Slide, Theme, SlideMaster, SlideLayout } from '../core/types';
+import type { Presentation, PresentationMetadata, Size, Slide, Theme, SlideMaster, SlideLayout, SlideElement } from '../core/types';
 import type { PPTXArchive } from '../core/unzip';
 import { PPTX_PATHS, getSlidePath } from '../core/unzip';
 import { MissingFileError, XMLParseError, PPTXError } from '../core/errors';
@@ -228,6 +228,13 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
   // Extract embedded fonts
   const { fonts } = parseEmbeddedFonts(archive);
 
+  // Resolve OOXML theme-font references (+mj-lt, +mn-lt, +mj-ea, etc.)
+  // on every text run so the renderer receives real font family names.
+  // Without this, runs that inherited their fontFamily from the master's
+  // txStyles render with "+mj-lt" as the literal CSS font-family, which
+  // matches nothing and falls back to the browser's default.
+  resolveThemeFontReferences(slides, slideLayouts, slideMasters, theme);
+
   return {
     metadata,
     slideSize,
@@ -237,6 +244,64 @@ export async function parsePPTX(archive: PPTXArchive): Promise<Presentation> {
     slideLayouts,
     fonts,
   };
+}
+
+/**
+ * OOXML uses symbolic typeface names like `+mj-lt` (major Latin),
+ * `+mn-lt` (minor Latin), `+mj-ea`/`+mn-ea` (East Asian), `+mj-cs`/`+mn-cs`
+ * (complex script) to reference theme fonts. These aren't real font family
+ * names — the renderer needs the resolved names from the theme. This walks
+ * every parsed text body and rewrites such references in place.
+ */
+function resolveThemeFontReferences(
+  slides: Slide[],
+  slideLayouts: Map<string, SlideLayout>,
+  slideMasters: Map<string, SlideMaster>,
+  theme: Theme
+): void {
+  const resolve = (ref: string): string => {
+    // Match `+mj-xx` (major) or `+mn-xx` (minor); script suffix is ignored
+    // because our theme model only tracks one major and one minor font.
+    if (ref.startsWith('+mj-')) return theme.fonts.major;
+    if (ref.startsWith('+mn-')) return theme.fonts.minor;
+    return ref;
+  };
+
+  const walkElements = (elements: SlideElement[]): void => {
+    for (const el of elements) {
+      const text = (el as any).text;
+      if (text?.paragraphs) {
+        for (const p of text.paragraphs) {
+          for (const r of p.runs ?? []) {
+            if (r.fontFamily && r.fontFamily.startsWith('+')) {
+              r.fontFamily = resolve(r.fontFamily);
+            }
+          }
+        }
+      }
+      // Recurse into groups/tables/diagrams.
+      if ((el as any).children) walkElements((el as any).children);
+      if ((el as any).rows) {
+        for (const row of (el as any).rows) {
+          for (const cell of row.cells ?? []) {
+            if (cell.text?.paragraphs) {
+              for (const p of cell.text.paragraphs) {
+                for (const r of p.runs ?? []) {
+                  if (r.fontFamily && r.fontFamily.startsWith('+')) {
+                    r.fontFamily = resolve(r.fontFamily);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  for (const slide of slides) walkElements(slide.elements);
+  for (const layout of slideLayouts.values()) walkElements(layout.elements);
+  for (const master of slideMasters.values()) walkElements(master.elements);
 }
 
 /**

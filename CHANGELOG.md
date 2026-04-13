@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+### Fixed
+
+- Resolve OOXML theme font references (`+mj-lt`, `+mn-lt`, `+mj-ea`, etc.) to the theme's actual font names. Previously these symbolic references leaked through to CSS `font-family`, matching no installed font and falling back to the browser default. Text now renders in the presentation's intended typeface.
+
 ## 0.2.1
 
 ### Fixed
