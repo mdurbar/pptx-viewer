@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+
+- Republish with the actual 0.2.0 code. The 0.2.0 npm tarball was published with a stale `dist/` from before the placeholder inheritance work, so installs of 0.2.0 did not include the fix. 0.2.1 ships the correct bundle.
+
 ## 0.2.0
 
 ### Added
