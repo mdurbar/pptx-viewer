@@ -5,6 +5,7 @@
  */
 
 import type { EmbeddedFont } from '../core/types';
+import { sanitizeFontFamily } from '../utils/css';
 
 /** ID of the style element used for font injection */
 const FONT_STYLE_ID = 'pptx-embedded-fonts';
@@ -35,12 +36,14 @@ export function injectFontStyles(fonts: Map<string, EmbeddedFont>): void {
   const styleEl = document.createElement('style');
   styleEl.id = FONT_STYLE_ID;
 
-  // Generate @font-face rules
+  // Generate @font-face rules. Font names are sanitized with the same
+  // shared policy used at every font-family reference site, so the
+  // @font-face family always matches what renderers emit.
   const rules = Array.from(fonts.values())
     .map(
       (font) => `
 @font-face {
-  font-family: "${escapeCssFontName(font.name)}";
+  font-family: "${sanitizeFontFamily(font.name)}";
   src: url("${font.url}") format("${font.format}");
   font-display: swap;
 }`
@@ -63,15 +66,3 @@ export function cleanupFontStyles(): void {
   }
 }
 
-/**
- * Escapes a font name for use in CSS.
- *
- * Handles special characters that could break CSS parsing.
- *
- * @param name - Font name to escape
- * @returns Escaped font name safe for CSS
- */
-function escapeCssFontName(name: string): string {
-  // Escape backslashes and double quotes
-  return name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}

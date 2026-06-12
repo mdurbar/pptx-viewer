@@ -15,6 +15,8 @@ import type {
   TextBody,
   TextAutofit,
   Paragraph,
+  LineSpacing,
+  ParagraphSpacing,
   TextRun,
   BulletStyle,
   Color,
@@ -28,9 +30,10 @@ import {
   findChildByName,
   findChildrenByName,
   getAttribute,
+  getLocalName,
   getNumberAttribute,
   getBooleanAttribute,
-  getTextContent,
+  getRawTextContent,
 } from '../utils/xml';
 import { emuToPixels, centipointsToPixels } from '../utils/units';
 import { parseHexColor, resolveThemeColor, resolvePresetColor, parseOoxmlAlpha } from '../utils/color';
@@ -164,26 +167,34 @@ function parseParagraph(
   const level = getNumberAttribute(pPr || pElement, 'lvl', 0);
   const { marginLeft, indent } = parseIndentation(pPr);
 
-  // Parse runs
-  const rElements = findChildrenByName(pElement, 'r');
-  for (const rElement of rElements) {
-    const run = parseTextRun(rElement, themeColors, relationships);
-    runs.push(run);
-  }
+  // Parse runs, line breaks, and fields in document order (CT_TextParagraph
+  // is an ordered sequence): <a:br/> is a hard line break at its position,
+  // and <a:fld> (slide number, date) renders where it appears, with its own
+  // run properties.
+  let pendingBreak = false;
+  for (let i = 0; i < pElement.children.length; i++) {
+    const child = pElement.children[i];
+    const name = getLocalName(child);
 
-  // Handle line breaks (br elements)
-  const brElements = findChildrenByName(pElement, 'br');
-  if (brElements.length > 0 && runs.length === 0) {
-    runs.push({ text: '' });
-  }
-
-  // Handle fields (fld elements) like slide numbers, dates
-  const fldElements = findChildrenByName(pElement, 'fld');
-  for (const fldElement of fldElements) {
-    const tElement = findChildByName(fldElement, 't');
-    if (tElement) {
-      runs.push({ text: getTextContent(tElement) });
+    if (name === 'r' || name === 'fld') {
+      const run = parseTextRun(child, themeColors, relationships);
+      if (pendingBreak) {
+        run.breakBefore = true;
+        pendingBreak = false;
+      }
+      runs.push(run);
+    } else if (name === 'br') {
+      if (pendingBreak) {
+        // Consecutive breaks: materialize the previous one as an empty line
+        runs.push({ text: '', breakBefore: true });
+      }
+      pendingBreak = true;
     }
+  }
+
+  // A trailing (or run-less) break still has to produce a new line
+  if (pendingBreak) {
+    runs.push({ text: '', breakBefore: runs.length > 0 });
   }
 
   return {
@@ -222,25 +233,28 @@ function parseParagraphAlign(pPr: Element | null): Paragraph['align'] {
 
 /**
  * Parses line spacing.
+ *
+ * `spcPct` is a multiple of single line spacing; `spcPts` is an absolute
+ * height in centipoints. The two have different units, so they are kept
+ * distinct (see {@link LineSpacing}) — collapsing them to one multiplier
+ * against an assumed font size produces wrong spacing for any other size.
  */
-function parseLineSpacing(pPr: Element | null): number | undefined {
+function parseLineSpacing(pPr: Element | null): LineSpacing | undefined {
   if (!pPr) return undefined;
 
   const lnSpc = findChildByName(pPr, 'lnSpc');
   if (!lnSpc) return undefined;
 
-  // Check for percentage-based spacing
   const spcPct = findChildByName(lnSpc, 'spcPct');
   if (spcPct) {
     const val = getNumberAttribute(spcPct, 'val', 100000);
-    return val / 100000; // Convert to multiplier
+    return { type: 'multiple', value: val / 100000 };
   }
 
-  // Check for point-based spacing
   const spcPts = findChildByName(lnSpc, 'spcPts');
   if (spcPts) {
     const val = getNumberAttribute(spcPts, 'val', 1200);
-    return centipointsToPixels(val) / 16; // Approximate line height ratio
+    return { type: 'exact', px: centipointsToPixels(val) };
   }
 
   return undefined;
@@ -248,25 +262,27 @@ function parseLineSpacing(pPr: Element | null): number | undefined {
 
 /**
  * Parses spacing before/after paragraph.
+ *
+ * `spcPct` is relative to the paragraph's text size, which is only known
+ * at render time (runs may inherit their size), so it is kept as a
+ * percentage (see {@link ParagraphSpacing}).
  */
-function parseSpacing(pPr: Element | null, elementName: string): number | undefined {
+function parseSpacing(pPr: Element | null, elementName: string): ParagraphSpacing | undefined {
   if (!pPr) return undefined;
 
   const spcElement = findChildByName(pPr, elementName);
   if (!spcElement) return undefined;
 
-  // Check for point-based spacing
   const spcPts = findChildByName(spcElement, 'spcPts');
   if (spcPts) {
     const val = getNumberAttribute(spcPts, 'val', 0);
-    return centipointsToPixels(val);
+    return { type: 'exact', px: centipointsToPixels(val) };
   }
 
-  // Check for percentage-based spacing (relative to line height)
   const spcPct = findChildByName(spcElement, 'spcPct');
   if (spcPct) {
     const val = getNumberAttribute(spcPct, 'val', 0);
-    return (val / 100000) * 16; // Approximate based on default line height
+    return { type: 'percent', value: val / 100000 };
   }
 
   return undefined;
@@ -370,9 +386,10 @@ function parseTextRun(
   themeColors: ThemeColors,
   relationships?: RelationshipMap
 ): TextRun {
-  // Get text content
+  // Get text content. Run text is whitespace-significant — runs routinely
+  // carry leading/trailing spaces where formatting changes mid-sentence.
   const tElement = findChildByName(rElement, 't');
-  const text = tElement ? getTextContent(tElement) : '';
+  const text = tElement ? getRawTextContent(tElement) : '';
 
   // Parse run properties
   const rPr = findChildByName(rElement, 'rPr');

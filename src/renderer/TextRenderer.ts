@@ -7,6 +7,7 @@
 import type { TextBody, Paragraph, TextRun, Color, BulletStyle, TextAutofit, TextGlow, TextReflection } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { SVG_NS } from '../utils/svg';
+import { sanitizeFontFamily, isSafeLinkUrl } from '../utils/css';
 
 /**
  * Tracks numbering state for lists across paragraphs.
@@ -65,10 +66,13 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
     lastBulletType: new Map(),
   };
 
-  // Get autofit context
+  // Get autofit context. Values come from untrusted content: PowerPoint
+  // only ever shrinks (fontScale ≤ 1) and caps line-spacing reduction at
+  // 20%, so clamp to a sane range — an unclamped reduction of 1 would
+  // collapse text to zero line height (hidden-disclaimer spoofing).
   const autofitContext: AutofitContext = {
-    fontScale: text.autofit?.fontScale ?? 1,
-    lineSpacingReduction: text.autofit?.lineSpacingReduction ?? 0,
+    fontScale: clamp(text.autofit?.fontScale ?? 1, 0.05, 1),
+    lineSpacingReduction: clamp(text.autofit?.lineSpacingReduction ?? 0, 0, 0.4),
   };
 
   // Render paragraphs
@@ -76,6 +80,60 @@ export function renderTextBody(text: TextBody, container: HTMLElement): void {
     const pElement = renderParagraph(paragraph, numberingState, autofitContext);
     container.appendChild(pElement);
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Single line spacing as a fraction of the font size. OOXML `spcPct`
+ * values are multiples of single spacing, which from typical font metrics
+ * is ~1.2x the em size — mapping 100% to CSS line-height 1.0 renders
+ * every explicitly-spaced paragraph too tight.
+ */
+export const SINGLE_LINE_SPACING = 1.2;
+
+/** Browser default font size, the fallback when no run declares one. */
+const DEFAULT_FONT_SIZE_PX = 16;
+
+/**
+ * Floors for line height so untrusted spacing values can't collapse text
+ * to (near) zero. Unitless for `multiple` spacing, pixels for `exact`.
+ */
+export const MIN_LINE_HEIGHT = 0.1;
+export const MIN_LINE_HEIGHT_PX = 4;
+
+/**
+ * The font size percent-based paragraph spacing is measured against:
+ * the largest run size in the paragraph (falling back to the browser
+ * default when no run declares a size).
+ */
+function effectiveFontSize(paragraph: Paragraph, autofitContext: AutofitContext): number {
+  let size = 0;
+  for (const run of paragraph.runs) {
+    if (run.fontSize && run.fontSize > size) {
+      size = run.fontSize;
+    }
+  }
+  return (size || DEFAULT_FONT_SIZE_PX) * autofitContext.fontScale;
+}
+
+/**
+ * Resolves space-before/space-after to pixels. Values come from
+ * untrusted content, so the result is clamped to non-negative — a
+ * negative margin would pull paragraphs over each other.
+ */
+function resolveParagraphSpacing(
+  spacing: NonNullable<Paragraph['spaceBefore']>,
+  paragraph: Paragraph,
+  autofitContext: AutofitContext
+): number {
+  const px =
+    spacing.type === 'exact'
+      ? spacing.px
+      : spacing.value * effectiveFontSize(paragraph, autofitContext);
+  return Math.max(px, 0);
 }
 
 /**
@@ -89,60 +147,65 @@ function renderParagraph(
   const p = document.createElement('p');
   p.style.margin = '0';
   p.style.padding = '0';
-  p.style.display = 'flex';
-  p.style.alignItems = 'baseline';
 
-  // Apply alignment
-  switch (paragraph.align) {
-    case 'center':
-      p.style.justifyContent = 'center';
-      break;
-    case 'right':
-      p.style.justifyContent = 'flex-end';
-      break;
-    default:
-      p.style.justifyContent = 'flex-start';
+  // Paragraphs are normal block flow: alignment via text-align (a flex
+  // row can't center text whose wrapper fills the row), hanging indents
+  // via text-indent.
+  if (paragraph.align && paragraph.align !== 'left') {
+    p.style.textAlign = paragraph.align;
   }
 
-  // Apply line spacing with autofit reduction
-  if (paragraph.lineSpacing) {
-    const reducedSpacing = paragraph.lineSpacing * (1 - autofitContext.lineSpacingReduction);
-    p.style.lineHeight = String(Math.max(reducedSpacing, 0.8)); // Don't go below 0.8
+  // Apply line spacing with autofit reduction. Values come from untrusted
+  // content, so floor the result above zero — an explicit spcPct/spcPts of
+  // 0 would otherwise collapse text to zero line height (hidden-text
+  // spoofing), the same vector the autofit clamp guards against.
+  const reduction = 1 - autofitContext.lineSpacingReduction;
+  const spacing = paragraph.lineSpacing;
+  if (!spacing) {
+    if (autofitContext.lineSpacingReduction > 0) {
+      p.style.lineHeight = String(SINGLE_LINE_SPACING * reduction);
+    }
+  } else if (spacing.type === 'multiple') {
+    p.style.lineHeight = String(Math.max(spacing.value * SINGLE_LINE_SPACING * reduction, MIN_LINE_HEIGHT));
+  } else {
+    p.style.lineHeight = `${Math.max(spacing.px * reduction, MIN_LINE_HEIGHT_PX)}px`;
   }
 
-  // Apply spacing
+  // Apply space before/after (percent variants are relative to text size)
   if (paragraph.spaceBefore) {
-    p.style.marginTop = `${paragraph.spaceBefore}px`;
+    p.style.marginTop = `${resolveParagraphSpacing(paragraph.spaceBefore, paragraph, autofitContext)}px`;
   }
   if (paragraph.spaceAfter) {
-    p.style.marginBottom = `${paragraph.spaceAfter}px`;
+    p.style.marginBottom = `${resolveParagraphSpacing(paragraph.spaceAfter, paragraph, autofitContext)}px`;
   }
 
-  // Calculate indentation
+  // Indentation: marginLeft is where wrapped text sits; indent shifts the
+  // first line relative to it (negative = hanging, the bullet case).
   const level = paragraph.level || 0;
-  let leftMargin = paragraph.marginLeft ?? (level * 36); // Default 36px per level
+  const leftMargin = paragraph.marginLeft ?? (level * 36); // Default 36px per level
   const hangingIndent = paragraph.indent ?? (paragraph.bullet ? -18 : 0); // Default hanging indent for bullets
 
-  // Apply left margin
   if (leftMargin > 0) {
     p.style.marginLeft = `${leftMargin}px`;
+  }
+  if (hangingIndent !== 0) {
+    p.style.textIndent = `${hangingIndent}px`;
   }
 
   // Add bullet point
   if (paragraph.bullet) {
     const bulletSpan = document.createElement('span');
-    bulletSpan.style.flexShrink = '0';
+    // inline-block: gives the bullet a fixed width (so following text
+    // starts at the paragraph's left margin) and resets text-indent
     bulletSpan.style.display = 'inline-block';
 
-    // Apply hanging indent width to bullet
     const bulletWidth = Math.abs(hangingIndent) || 18;
     bulletSpan.style.width = `${bulletWidth}px`;
-    bulletSpan.style.marginLeft = hangingIndent < 0 ? `${hangingIndent}px` : '0';
     bulletSpan.style.textAlign = 'left';
 
     // Apply bullet styling
     if (paragraph.bullet.font) {
-      bulletSpan.style.fontFamily = `"${paragraph.bullet.font}", sans-serif`;
+      bulletSpan.style.fontFamily = `"${sanitizeFontFamily(paragraph.bullet.font)}", sans-serif`;
     }
     if (paragraph.bullet.color) {
       bulletSpan.style.color = colorToCss(paragraph.bullet.color);
@@ -184,23 +247,20 @@ function renderParagraph(
     p.appendChild(bulletSpan);
   }
 
-  // Create a wrapper for text content
-  const textWrapper = document.createElement('span');
-  textWrapper.style.flex = '1';
-  textWrapper.style.minWidth = '0'; // Allow text to shrink
-
-  // Render text runs
+  // Render text runs, honoring hard line breaks (<a:br/>)
   for (const run of paragraph.runs) {
-    const runElement = renderTextRun(run, autofitContext);
-    textWrapper.appendChild(runElement);
+    if (run.breakBefore) {
+      p.appendChild(document.createElement('br'));
+    }
+    p.appendChild(renderTextRun(run, autofitContext));
   }
 
-  // Empty paragraph - add a line break to maintain height
+  // Empty paragraph - add a non-breaking space to maintain height
   if (paragraph.runs.length === 0 && !paragraph.bullet) {
-    textWrapper.innerHTML = '&nbsp;';
+    const filler = document.createElement('span');
+    filler.textContent = ' ';
+    p.appendChild(filler);
   }
-
-  p.appendChild(textWrapper);
 
   return p;
 }
@@ -291,7 +351,7 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
 
   // Apply font family
   if (run.fontFamily) {
-    span.style.fontFamily = `"${run.fontFamily}", sans-serif`;
+    span.style.fontFamily = `"${sanitizeFontFamily(run.fontFamily)}", sans-serif`;
   }
 
   // Apply font size with autofit scaling
@@ -370,8 +430,10 @@ function renderTextRun(run: TextRun, autofitContext: AutofitContext): HTMLElemen
     span.style.paintOrder = 'stroke fill';
   }
 
-  // Apply hyperlink
-  if (run.link) {
+  // Apply hyperlink. Targets come from untrusted relationship entries —
+  // only navigation schemes may reach href (a javascript: URL would
+  // execute in the host page on click).
+  if (run.link && isSafeLinkUrl(run.link)) {
     const link = document.createElement('a');
     link.href = run.link;
     link.target = '_blank';
@@ -482,12 +544,11 @@ function wrapWithReflection(element: HTMLElement, reflection: TextReflection): H
   reflectionEl.style.pointerEvents = 'none';
   reflectionEl.setAttribute('aria-hidden', 'true');
 
-  // Remove any links in reflection to avoid duplicate navigation
+  // Remove any links in the reflection to avoid duplicate navigation,
+  // keeping their (already-safe) child nodes without re-parsing HTML.
   const links = reflectionEl.querySelectorAll('a');
   links.forEach(link => {
-    const span = document.createElement('span');
-    span.innerHTML = link.innerHTML;
-    link.replaceWith(span);
+    link.replaceWith(...link.childNodes);
   });
 
   container.appendChild(element);

@@ -8,6 +8,8 @@
 import type { TableElement, TableRow, TableCell, CellBorders, Stroke } from '../core/types';
 import { colorToCss } from '../utils/color';
 import { SVG_NS } from '../utils/svg';
+import { sanitizeFontFamily } from '../utils/css';
+import { SINGLE_LINE_SPACING, MIN_LINE_HEIGHT, MIN_LINE_HEIGHT_PX } from './TextRenderer';
 
 /**
  * Renders a table element to an SVG foreignObject containing an HTML table.
@@ -152,78 +154,89 @@ function renderTableCell(
 
   // Render text content
   if (cell.text && cell.text.paragraphs.length > 0) {
-    const textHtml = renderCellText(cell);
-    td.innerHTML = textHtml;
+    for (const p of renderCellText(cell)) {
+      td.appendChild(p);
+    }
   }
 
   return td;
 }
 
 /**
- * Renders cell text content to HTML.
+ * Renders cell text content as DOM elements.
+ *
+ * Built with createElement/textContent/style assignment (never innerHTML):
+ * run text, font names, and colors come from untrusted PPTX content.
  */
-function renderCellText(cell: TableCell): string {
-  if (!cell.text) return '';
+function renderCellText(cell: TableCell): HTMLParagraphElement[] {
+  if (!cell.text) return [];
 
-  const paragraphs: string[] = [];
+  const paragraphs: HTMLParagraphElement[] = [];
 
   for (const para of cell.text.paragraphs) {
+    const p = document.createElement('p');
+    p.style.margin = '0';
+
+    if (para.align) {
+      p.style.textAlign = para.align;
+    }
+    if (para.lineSpacing) {
+      // Floor above zero — an untrusted spcPct/spcPts of 0 would otherwise
+      // collapse cell text to zero line height (hidden-text spoofing),
+      // matching the guard in TextRenderer.
+      p.style.lineHeight =
+        para.lineSpacing.type === 'multiple'
+          ? String(Math.max(para.lineSpacing.value * SINGLE_LINE_SPACING, MIN_LINE_HEIGHT))
+          : `${Math.max(para.lineSpacing.px, MIN_LINE_HEIGHT_PX)}px`;
+    }
+
     if (para.runs.length === 0) {
-      paragraphs.push('<p style="margin: 0; min-height: 1em;">&nbsp;</p>');
+      p.style.minHeight = '1em';
+      p.appendChild(document.createTextNode(' '));
+      paragraphs.push(p);
       continue;
     }
 
-    const runHtml: string[] = [];
     for (const run of para.runs) {
-      let html = escapeHtml(run.text);
-
-      // Apply formatting
-      if (run.bold) {
-        html = `<strong>${html}</strong>`;
-      }
-      if (run.italic) {
-        html = `<em>${html}</em>`;
-      }
-      if (run.underline) {
-        html = `<u>${html}</u>`;
-      }
-      if (run.strikethrough) {
-        html = `<s>${html}</s>`;
+      if (run.breakBefore) {
+        p.appendChild(document.createElement('br'));
       }
 
-      // Apply inline styles
-      const styles: string[] = [];
+      let node: HTMLElement = document.createElement('span');
+      node.textContent = run.text;
+
       if (run.fontFamily) {
-        styles.push(`font-family: "${run.fontFamily}", sans-serif`);
+        node.style.fontFamily = `"${sanitizeFontFamily(run.fontFamily)}", sans-serif`;
       }
       if (run.fontSize) {
-        styles.push(`font-size: ${run.fontSize}px`);
+        node.style.fontSize = `${run.fontSize}px`;
       }
       if (run.color) {
-        styles.push(`color: ${colorToCss(run.color)}`);
+        node.style.color = colorToCss(run.color);
       }
 
-      if (styles.length > 0) {
-        html = `<span style="${styles.join('; ')}">${html}</span>`;
-      }
+      // Wrap in formatting elements (innermost = text span)
+      if (run.bold) node = wrap(node, 'strong');
+      if (run.italic) node = wrap(node, 'em');
+      if (run.underline) node = wrap(node, 'u');
+      if (run.strikethrough) node = wrap(node, 's');
 
-      runHtml.push(html);
+      p.appendChild(node);
     }
 
-    // Paragraph styles
-    const pStyles: string[] = ['margin: 0'];
-
-    if (para.align) {
-      pStyles.push(`text-align: ${para.align}`);
-    }
-    if (para.lineSpacing) {
-      pStyles.push(`line-height: ${para.lineSpacing}`);
-    }
-
-    paragraphs.push(`<p style="${pStyles.join('; ')}">${runHtml.join('')}</p>`);
+    paragraphs.push(p);
   }
 
-  return paragraphs.join('');
+  return paragraphs;
+}
+
+/**
+ * Wraps an element in a new element of the given tag.
+ */
+function wrap(node: HTMLElement, tag: string): HTMLElement {
+  const outer = document.createElement(tag);
+  outer.appendChild(node);
+  return outer;
 }
 
 /**
@@ -233,16 +246,4 @@ function formatBorder(stroke: Stroke): string {
   const width = Math.max(1, Math.round(stroke.width));
   const color = colorToCss(stroke.color);
   return `${width}px solid ${color}`;
-}
-
-/**
- * Escapes HTML special characters.
- */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

@@ -10,6 +10,7 @@ import {
   findAllByName,
   findFirstByName,
   getTextContent,
+  getRawTextContent,
   traversePath,
   NAMESPACES,
 } from '../src/utils/xml';
@@ -191,6 +192,23 @@ describe('XML Utilities', () => {
     it('returns empty string for empty element', () => {
       const doc = parseXml('<root/>');
       expect(getTextContent(doc.documentElement)).toBe('');
+    });
+  });
+
+  describe('getRawTextContent', () => {
+    it('preserves surrounding whitespace', () => {
+      const doc = parseXml('<t xml:space="preserve">  Hello </t>');
+      expect(getRawTextContent(doc.documentElement)).toBe('  Hello ');
+    });
+
+    it('preserves whitespace-only content', () => {
+      const doc = parseXml('<t xml:space="preserve"> </t>');
+      expect(getRawTextContent(doc.documentElement)).toBe(' ');
+    });
+
+    it('returns empty string for empty elements', () => {
+      const doc = parseXml('<t/>');
+      expect(getRawTextContent(doc.documentElement)).toBe('');
     });
   });
 

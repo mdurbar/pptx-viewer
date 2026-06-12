@@ -196,11 +196,29 @@ export function findFirstByName(parent: Element, localName: string): Element | n
 /**
  * Gets the text content of an element, trimmed.
  *
+ * Only for cosmetic text (chart labels, metadata). Never use for `<a:t>`
+ * run text — see {@link getRawTextContent}.
+ *
  * @param element - Element to get text from
  * @returns Trimmed text content
  */
 export function getTextContent(element: Element): string {
   return element.textContent?.trim() || '';
+}
+
+/**
+ * Gets the text content of an element with whitespace preserved.
+ *
+ * OOXML run text (`<a:t>`) is whitespace-significant: PowerPoint splits
+ * formatting mid-sentence, so runs routinely carry leading/trailing spaces
+ * ("<a:t>Hello </a:t><a:t>world</a:t>"). Trimming concatenates words and
+ * shifts wrap points.
+ *
+ * @param element - Element to get text from
+ * @returns Text content as-is
+ */
+export function getRawTextContent(element: Element): string {
+  return element.textContent || '';
 }
 
 /**

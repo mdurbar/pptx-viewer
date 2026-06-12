@@ -111,6 +111,133 @@ describe('TextParser', () => {
       expect(result.paragraphs[0].align).toBe('center');
     });
 
+    it('preserves leading/trailing whitespace in run text', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r><t xml:space="preserve">Hello </t></r>
+            <r><rPr b="1"/><t>world</t></r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].runs[0].text).toBe('Hello ');
+      expect(result.paragraphs[0].runs[1].text).toBe('world');
+    });
+
+    it('marks runs after a line break with breakBefore', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r><t>line one</t></r>
+            <br/>
+            <r><t>line two</t></r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+      const runs = result.paragraphs[0].runs;
+
+      expect(runs).toHaveLength(2);
+      expect(runs[0].breakBefore).toBeUndefined();
+      expect(runs[1].breakBefore).toBe(true);
+    });
+
+    it('materializes consecutive and trailing line breaks', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <r><t>a</t></r>
+            <br/>
+            <br/>
+            <r><t>b</t></r>
+            <br/>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+      const runs = result.paragraphs[0].runs;
+
+      // a, [empty line], b, [trailing empty line]
+      expect(runs.map((r) => r.text)).toEqual(['a', '', 'b', '']);
+      expect(runs[1].breakBefore).toBe(true);
+      expect(runs[2].breakBefore).toBe(true);
+      expect(runs[3].breakBefore).toBe(true);
+    });
+
+    it('produces a single empty line for a paragraph containing only a break', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p><br/></p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+      const runs = result.paragraphs[0].runs;
+
+      expect(runs).toHaveLength(1);
+      expect(runs[0].text).toBe('');
+      expect(runs[0].breakBefore).toBeFalsy();
+    });
+
+    it('keeps fields in document order with their formatting', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p>
+            <fld id="{1}" type="slidenum"><rPr b="1"/><t>7</t></fld>
+            <r><t> of 10</t></r>
+          </p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+      const runs = result.paragraphs[0].runs;
+
+      expect(runs.map((r) => r.text)).toEqual(['7', ' of 10']);
+      expect(runs[0].bold).toBe(true);
+    });
+
+    it('parses percent line spacing as a multiple of single spacing', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p><pPr><lnSpc><spcPct val="150000"/></lnSpc></pPr><r><t>x</t></r></p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].lineSpacing).toEqual({ type: 'multiple', value: 1.5 });
+    });
+
+    it('parses exact line spacing as absolute pixels', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p><pPr><lnSpc><spcPts val="2400"/></lnSpc></pPr><r><t>x</t></r></p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      // 2400 centipoints = 24pt = 32px at 96 DPI
+      expect(result.paragraphs[0].lineSpacing).toEqual({ type: 'exact', px: 32 });
+    });
+
+    it('parses percent space-before relative to text size', () => {
+      const xml = parseXml(`
+        <txBody>
+          <bodyPr/>
+          <p><pPr><spcBef><spcPct val="50000"/></spcBef></pPr><r><t>x</t></r></p>
+        </txBody>
+      `);
+      const result = parseTextBody(xml.documentElement, mockTheme);
+
+      expect(result.paragraphs[0].spaceBefore).toEqual({ type: 'percent', value: 0.5 });
+    });
+
     it('parses bold text', () => {
       const xml = parseXml(`
         <txBody>

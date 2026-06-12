@@ -39,6 +39,20 @@ describe('Color Utilities', () => {
       expect(parseHexColor('000000', -0.5).alpha).toBe(0);
       expect(parseHexColor('000000', 1.5).alpha).toBe(1);
     });
+
+    it('expands 3-digit shorthand', () => {
+      expect(parseHexColor('F0A').hex).toBe('#FF00AA');
+    });
+
+    it('falls back to black for malformed values', () => {
+      // PPTX is untrusted input — anything but valid hex must not flow
+      // into CSS/markup downstream
+      expect(parseHexColor('not-a-color').hex).toBe('#000000');
+      expect(parseHexColor('"><script>alert(1)</script>').hex).toBe('#000000');
+      expect(parseHexColor('FF00').hex).toBe('#000000');
+      expect(parseHexColor('FF0000AA').hex).toBe('#000000');
+      expect(parseHexColor('').hex).toBe('#000000');
+    });
   });
 
   describe('parseOoxmlAlpha', () => {
