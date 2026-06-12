@@ -603,6 +603,27 @@ export interface TextAutofit {
 }
 
 /**
+ * Line spacing for a paragraph.
+ *
+ * `multiple` mirrors OOXML `spcPct`: a multiple of single line spacing
+ * (1 = single, which is ~1.2x the font size). `exact` mirrors `spcPts`:
+ * an absolute line height, already converted to pixels.
+ */
+export type LineSpacing =
+  | { type: 'multiple'; value: number }
+  | { type: 'exact'; px: number };
+
+/**
+ * Space before/after a paragraph.
+ *
+ * `exact` mirrors OOXML `spcPts` (converted to pixels); `percent` mirrors
+ * `spcPct` and is relative to the paragraph's text size (1 = 100%).
+ */
+export type ParagraphSpacing =
+  | { type: 'exact'; px: number }
+  | { type: 'percent'; value: number };
+
+/**
  * A paragraph containing text runs.
  */
 export interface Paragraph {
@@ -610,12 +631,12 @@ export interface Paragraph {
   runs: TextRun[];
   /** Paragraph alignment */
   align?: 'left' | 'center' | 'right' | 'justify';
-  /** Line spacing multiplier */
-  lineSpacing?: number;
-  /** Space before paragraph in pixels */
-  spaceBefore?: number;
-  /** Space after paragraph in pixels */
-  spaceAfter?: number;
+  /** Line spacing */
+  lineSpacing?: LineSpacing;
+  /** Space before paragraph */
+  spaceBefore?: ParagraphSpacing;
+  /** Space after paragraph */
+  spaceAfter?: ParagraphSpacing;
   /** Bullet point style */
   bullet?: BulletStyle;
   /** Indentation level (for lists) */
@@ -632,6 +653,8 @@ export interface Paragraph {
 export interface TextRun {
   /** The text content */
   text: string;
+  /** Hard line break (`<a:br/>`) immediately before this run */
+  breakBefore?: boolean;
   /** Font family */
   fontFamily?: string;
   /** Font size in pixels */

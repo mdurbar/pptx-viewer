@@ -22,7 +22,18 @@ import type { Color, ThemeColors } from '../core/types';
  */
 export function parseHexColor(hex: string, alpha: number = 1): Color {
   // Remove # if present
-  const cleanHex = hex.replace(/^#/, '').toUpperCase();
+  let cleanHex = hex.replace(/^#/, '').toUpperCase();
+
+  // Expand 3-digit shorthand (rare, but emitted by some producers)
+  if (/^[0-9A-F]{3}$/.test(cleanHex)) {
+    cleanHex = cleanHex.replace(/./g, (c) => c + c);
+  }
+
+  // PPTX content is untrusted input; anything but RRGGBB falls back to black
+  // so malformed values can't flow into CSS/markup downstream.
+  if (!/^[0-9A-F]{6}$/.test(cleanHex)) {
+    cleanHex = '000000';
+  }
 
   return {
     hex: `#${cleanHex}`,
