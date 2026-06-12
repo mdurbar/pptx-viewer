@@ -101,8 +101,8 @@ const DEFAULT_FONT_SIZE_PX = 16;
  * Floors for line height so untrusted spacing values can't collapse text
  * to (near) zero. Unitless for `multiple` spacing, pixels for `exact`.
  */
-const MIN_LINE_HEIGHT = 0.1;
-const MIN_LINE_HEIGHT_PX = 4;
+export const MIN_LINE_HEIGHT = 0.1;
+export const MIN_LINE_HEIGHT_PX = 4;
 
 /**
  * The font size percent-based paragraph spacing is measured against:

@@ -92,6 +92,22 @@ describe('TableRenderer', () => {
     expect(ps[1].style.lineHeight).toBe('24px');
   });
 
+  it('floors explicit zero line spacing above zero in cells', () => {
+    const fo = renderTable(
+      makeTable({
+        text: {
+          paragraphs: [
+            { runs: [{ text: 'a' }], lineSpacing: { type: 'multiple', value: 0 } },
+            { runs: [{ text: 'b' }], lineSpacing: { type: 'exact', px: 0 } },
+          ],
+        },
+      })
+    );
+    const ps = fo.querySelectorAll('p');
+    expect(parseFloat(ps[0].style.lineHeight)).toBeGreaterThan(0);
+    expect(parseFloat(ps[1].style.lineHeight)).toBeGreaterThan(0);
+  });
+
   it('renders empty cell paragraphs with preserved height and line spacing', () => {
     const fo = renderTable(
       makeTable({

@@ -9,7 +9,7 @@ import type { TableElement, TableRow, TableCell, CellBorders, Stroke } from '../
 import { colorToCss } from '../utils/color';
 import { SVG_NS } from '../utils/svg';
 import { sanitizeFontFamily } from '../utils/css';
-import { SINGLE_LINE_SPACING } from './TextRenderer';
+import { SINGLE_LINE_SPACING, MIN_LINE_HEIGHT, MIN_LINE_HEIGHT_PX } from './TextRenderer';
 
 /**
  * Renders a table element to an SVG foreignObject containing an HTML table.
@@ -181,10 +181,13 @@ function renderCellText(cell: TableCell): HTMLParagraphElement[] {
       p.style.textAlign = para.align;
     }
     if (para.lineSpacing) {
+      // Floor above zero — an untrusted spcPct/spcPts of 0 would otherwise
+      // collapse cell text to zero line height (hidden-text spoofing),
+      // matching the guard in TextRenderer.
       p.style.lineHeight =
         para.lineSpacing.type === 'multiple'
-          ? String(para.lineSpacing.value * SINGLE_LINE_SPACING)
-          : `${para.lineSpacing.px}px`;
+          ? String(Math.max(para.lineSpacing.value * SINGLE_LINE_SPACING, MIN_LINE_HEIGHT))
+          : `${Math.max(para.lineSpacing.px, MIN_LINE_HEIGHT_PX)}px`;
     }
 
     if (para.runs.length === 0) {
