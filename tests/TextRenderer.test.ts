@@ -137,6 +137,18 @@ describe('TextRenderer', () => {
       expect(parseFloat(container.querySelector('p')!.style.lineHeight)).toBeCloseTo(0.72);
     });
 
+    it('floors explicit zero line spacing above zero (no hidden-text collapse)', () => {
+      const multiple = render([
+        { runs: [{ text: 'x' }], lineSpacing: { type: 'multiple', value: 0 } },
+      ]);
+      expect(parseFloat(multiple.querySelector('p')!.style.lineHeight)).toBeGreaterThan(0);
+
+      const exact = render([
+        { runs: [{ text: 'x' }], lineSpacing: { type: 'exact', px: 0 } },
+      ]);
+      expect(parseFloat(exact.querySelector('p')!.style.lineHeight)).toBeGreaterThan(0);
+    });
+
     it('clamps negative space-before to zero', () => {
       const container = render([
         { runs: [{ text: 'x' }], spaceBefore: { type: 'exact', px: -40 } },

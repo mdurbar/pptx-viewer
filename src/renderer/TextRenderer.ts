@@ -98,6 +98,13 @@ export const SINGLE_LINE_SPACING = 1.2;
 const DEFAULT_FONT_SIZE_PX = 16;
 
 /**
+ * Floors for line height so untrusted spacing values can't collapse text
+ * to (near) zero. Unitless for `multiple` spacing, pixels for `exact`.
+ */
+const MIN_LINE_HEIGHT = 0.1;
+const MIN_LINE_HEIGHT_PX = 4;
+
+/**
  * The font size percent-based paragraph spacing is measured against:
  * the largest run size in the paragraph (falling back to the browser
  * default when no run declares a size).
@@ -148,7 +155,10 @@ function renderParagraph(
     p.style.textAlign = paragraph.align;
   }
 
-  // Apply line spacing with autofit reduction
+  // Apply line spacing with autofit reduction. Values come from untrusted
+  // content, so floor the result above zero — an explicit spcPct/spcPts of
+  // 0 would otherwise collapse text to zero line height (hidden-text
+  // spoofing), the same vector the autofit clamp guards against.
   const reduction = 1 - autofitContext.lineSpacingReduction;
   const spacing = paragraph.lineSpacing;
   if (!spacing) {
@@ -156,9 +166,9 @@ function renderParagraph(
       p.style.lineHeight = String(SINGLE_LINE_SPACING * reduction);
     }
   } else if (spacing.type === 'multiple') {
-    p.style.lineHeight = String(Math.max(spacing.value * SINGLE_LINE_SPACING * reduction, 0));
+    p.style.lineHeight = String(Math.max(spacing.value * SINGLE_LINE_SPACING * reduction, MIN_LINE_HEIGHT));
   } else {
-    p.style.lineHeight = `${Math.max(spacing.px * reduction, 0)}px`;
+    p.style.lineHeight = `${Math.max(spacing.px * reduction, MIN_LINE_HEIGHT_PX)}px`;
   }
 
   // Apply space before/after (percent variants are relative to text size)
@@ -534,12 +544,11 @@ function wrapWithReflection(element: HTMLElement, reflection: TextReflection): H
   reflectionEl.style.pointerEvents = 'none';
   reflectionEl.setAttribute('aria-hidden', 'true');
 
-  // Remove any links in reflection to avoid duplicate navigation
+  // Remove any links in the reflection to avoid duplicate navigation,
+  // keeping their (already-safe) child nodes without re-parsing HTML.
   const links = reflectionEl.querySelectorAll('a');
   links.forEach(link => {
-    const span = document.createElement('span');
-    span.innerHTML = link.innerHTML;
-    link.replaceWith(span);
+    link.replaceWith(...link.childNodes);
   });
 
   container.appendChild(element);
