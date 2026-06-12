@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 - 2026-06-12
+
+### Fixed
+
+- **Text now keeps the spaces between runs.** PowerPoint splits a sentence into multiple runs wherever formatting changes, and each run's text was being trimmed — so "Hello **world**" rendered as "Helloworld". Run text is now preserved verbatim, fixing word spacing and line wrapping throughout.
+- **Soft line breaks (Shift+Enter) render again.** A `<a:br/>` between runs was dropped, collapsing multi-line text onto one line. Line breaks now render in document order, and fields like slide numbers keep their position and formatting instead of jumping to the end of the paragraph.
+- **Centered, right-aligned, and justified text now actually aligns.** Every paragraph was rendering left-aligned regardless of its setting. Paragraphs now use block layout with real `text-align`, and bullet hanging-indents use `text-indent`.
+- **Line spacing matches PowerPoint.** Percentage spacing (`spcPct`) now maps to single-spacing as ~1.2x the font size instead of 1.0x (text was rendering ~17% too tight), and exact point spacing (`spcPts`) renders as an absolute height regardless of font size instead of as a wrong multiplier.
+
+### Security
+
+- **Closed an XSS hole in table rendering.** Table cells were built by string-concatenating HTML, so a crafted font name or color in a `.pptx` could inject and execute markup in the host page. Cells are now built with DOM APIs and never use `innerHTML`.
+- **Hyperlinks are restricted to safe schemes.** A `javascript:` (or other script-capable) hyperlink target in a slide is now rendered as plain text instead of a clickable link that would run on click.
+- **Font names from the file are sanitized** before they reach CSS, using one shared policy at every `@font-face` definition and `font-family` reference so embedded fonts still match (including non-ASCII names).
+- **Malformed colors fall back to black** instead of passing untrusted values straight into CSS.
+- Autofit values are clamped so a malicious deck can't collapse text to zero line height (hidden-text spoofing).
+
+### Changed
+
+- **Breaking:** `Paragraph.lineSpacing`, `spaceBefore`, and `spaceAfter` are now discriminated-union objects (`{ type: 'multiple' | 'exact' | 'percent', ... }`) instead of plain numbers, and `TextRun` gained an optional `breakBefore` flag. Code reading these as numbers must switch on the new shape.
+
 ## 0.2.2
 
 ### Fixed
